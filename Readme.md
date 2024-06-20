@@ -1,312 +1,124 @@
-Yes, you'll need a database to store user login information. For simplicity, we'll use H2, an in-memory database, for development. In a production environment, you would use a more robust database like MySQL, PostgreSQL, etc.
+Sure! Below is a simple example of a login page frontend using React. This example includes a basic form with fields for username and password, and a button to submit the form.
 
-### Step-by-Step with Database
-
-#### 1. Setting Up Spring Boot Backend
-
-**1.1. Create a Spring Boot Project:**
-
-- Use Spring Initializr (https://start.spring.io/) to generate a Spring Boot project with dependencies for Spring Web, Spring Security, Spring Data JPA, H2 Database (for development), and Lombok.
-
-**1.2. Configure Application Properties:**
-
-In `src/main/resources/application.properties`:
-
-```properties
-spring.datasource.url=jdbc:h2:mem:testdb
-spring.datasource.driverClassName=org.h2.Driver
-spring.datasource.username=sa
-spring.datasource.password=password
-spring.h2.console.enabled=true
-spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
-
-# H2 Console URL
-spring.h2.console.path=/h2-console
-
-# Security configuration
-spring.security.user.name=admin
-spring.security.user.password=admin
-```
-
-**1.3. Define User Entity:**
-
-```java
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-
-@Entity
-public class User {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String username;
-    private String password;
-    private String role;
-
-    // Getters and Setters
-}
-```
-
-**1.4. Create User Repository:**
-
-```java
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface UserRepository extends JpaRepository<User, Long> {
-    User findByUsername(String username);
-}
-```
-
-**1.5. Implement UserDetailsService for Authentication:**
-
-```java
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.stereotype.Service;
-
-import java.util.Collections;
-
-@Service
-public class CustomUserDetailsService implements UserDetailsService {
-    @Autowired
-    private UserRepository userRepository;
-
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new UsernameNotFoundException("User not found");
-        }
-        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), 
-                Collections.singletonList(new SimpleGrantedAuthority(user.getRole())));
-    }
-}
-```
-
-**1.6. Configure Spring Security:**
-
-```java
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
-
-    @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder());
-    }
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.csrf().disable()
-            .authorizeRequests()
-            .antMatchers("/login", "/register", "/h2-console/**").permitAll()
-            .anyRequest().authenticated()
-            .and()
-            .formLogin().loginPage("/login").permitAll()
-            .and()
-            .logout().permitAll();
-        
-        http.headers().frameOptions().disable(); // To enable H2 console
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-}
-```
-
-**1.7. Create REST Controller for Authentication:**
-
-```java
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.*;
-
-import java.security.Principal;
-
-@RestController
-@RequestMapping("/api")
-public class AuthController {
-    @Autowired
-    private UserRepository userRepository;
-
-    @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody User user) {
-        if(userRepository.findByUsername(user.getUsername()) != null) {
-            return ResponseEntity.badRequest().body("Username is already taken");
-        }
-        user.setPassword(new BCryptPasswordEncoder().encode(user.getPassword()));
-        userRepository.save(user);
-        return ResponseEntity.ok("User registered successfully");
-    }
-
-    @GetMapping("/user")
-    public ResponseEntity<?> getUserDetails(Principal principal) {
-        if(principal != null) {
-            return ResponseEntity.ok(userRepository.findByUsername(principal.getName()));
-        }
-        return ResponseEntity.status(401).body("Unauthorized");
-    }
-}
-```
-
-#### 2. Setting Up React Frontend
-
-**2.1. Create a React Application:**
+First, make sure you have a React environment set up. You can create a new React project using Create React App:
 
 ```sh
-npx create-react-app banking-app
-cd banking-app
-npm install axios react-router-dom
+npx create-react-app login-page
+cd login-page
+npm start
 ```
 
-**2.2. Implement User Login Page:**
-
-Create `Login.js`:
+Now, replace the contents of `src/App.js` with the following code:
 
 ```jsx
 import React, { useState } from 'react';
-import axios from 'axios';
+import './App.css';
 
-const Login = () => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
+function App() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        try {
-            const response = await axios.post('/login', { username, password });
-            localStorage.setItem('token', response.data.token);
-            window.location.href = '/main';
-        } catch (error) {
-            console.error('Login failed', error);
-        }
-    };
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    // Handle login logic here
+    console.log('Username:', username);
+    console.log('Password:', password);
+  };
 
-    return (
-        <form onSubmit={handleSubmit}>
-            <div>
-                <label>Username:</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
-            </div>
-            <div>
-                <label>Password:</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            <button type="submit">Login</button>
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>Login</h1>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit">Login</button>
         </form>
-    );
-};
-
-export default Login;
-```
-
-**2.3. Implement Main Page:**
-
-Create `Main.js`:
-
-```jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const Main = () => {
-    const [user, setUser] = useState(null);
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const response = await axios.get('/api/user', {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                });
-                setUser(response.data);
-            } catch (error) {
-                console.error('Failed to fetch user', error);
-            }
-        };
-
-        fetchUser();
-    }, []);
-
-    if (!user) {
-        return <div>Loading...</div>;
-    }
-
-    return (
-        <div>
-            <h1>Welcome, {user.username}</h1>
-        </div>
-    );
-};
-
-export default Main;
-```
-
-**2.4. Set Up Routing:**
-
-In `App.js`:
-
-```jsx
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
-import Login from './Login';
-import Main from './Main';
-
-const App = () => {
-    return (
-        <Router>
-            <Switch>
-                <Route path="/login" component={Login} />
-                <Route path="/main" component={Main} />
-                <Route path="/" component={Login} />
-            </Switch>
-        </Router>
-    );
-};
+      </header>
+    </div>
+  );
+}
 
 export default App;
 ```
 
-**2.5. Connect React to Spring Boot:**
+Next, add some basic styling by creating a `src/App.css` file with the following content:
 
-In `package.json`, add a proxy to the Spring Boot server:
+```css
+.App {
+  text-align: center;
+}
 
-```json
-"proxy": "http://localhost:8080"
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.login-form {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 300px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #333;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+button {
+  background-color: #61dafb;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+button:hover {
+  background-color: #21a1f1;
+}
 ```
 
-**2.6. Start the Applications:**
-
-- Start the Spring Boot application:
-
-```sh
-mvn spring-boot:run
-```
-
-- Start the React application:
-
-```sh
-npm start
-```
-
-### Conclusion
-
-This setup includes a database to store user login information. You can extend the functionality by adding more features and improving security measures as needed. In a production environment, you should use a more robust database system, secure passwords properly, and consider other security best practices.
+This will create a simple and clean login form with basic styling. You can further customize the styling and functionality as needed for your application.
