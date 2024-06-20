@@ -1,124 +1,121 @@
-Sure! Below is a simple example of a login page frontend using React. This example includes a basic form with fields for username and password, and a button to submit the form.
+In a Spring Boot application, you define the User entity in a Java class annotated with `@Entity`. This entity class maps to a table in your H2 database and contains fields representing the columns of that table. Typically, this class is created in a package like `com.example.bankingapp.model`.
 
-First, make sure you have a React environment set up. You can create a new React project using Create React App:
+Here's the complete code for defining the User entity:
 
-```sh
-npx create-react-app login-page
-cd login-page
-npm start
-```
+**1. Create the `User` entity class:**
 
-Now, replace the contents of `src/App.js` with the following code:
+1.1. Define the `User` entity in the `model` package:
 
-```jsx
-import React, { useState } from 'react';
-import './App.css';
+```java
+package com.example.bankingapp.model;
 
-function App() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    // Handle login logic here
-    console.log('Username:', username);
-    console.log('Password:', password);
-  };
+@Entity
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String username;
+    private String password;
+    private String role;
 
-  return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Login</h1>
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button type="submit">Login</button>
-        </form>
-      </header>
-    </div>
-  );
-}
+    // Getters and Setters
 
-export default App;
-```
+    public Long getId() {
+        return id;
+    }
 
-Next, add some basic styling by creating a `src/App.css` file with the following content:
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-```css
-.App {
-  text-align: center;
-}
+    public String getUsername() {
+        return username;
+    }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
-.login-form {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  width: 300px;
-}
+    public String getPassword() {
+        return password;
+    }
 
-.form-group {
-  margin-bottom: 15px;
-  text-align: left;
-}
+    public void setPassword(String password) {
+        this.password = password;
+    }
 
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #333;
-}
+    public String getRole() {
+        return role;
+    }
 
-.form-group input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-button {
-  background-color: #61dafb;
-  color: white;
-  padding: 10px 15px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-}
-
-button:hover {
-  background-color: #21a1f1;
+    public void setRole(String role) {
+        this.role = role;
+    }
 }
 ```
 
-This will create a simple and clean login form with basic styling. You can further customize the styling and functionality as needed for your application.
+1.2. Create a repository interface for the `User` entity:
+
+Create a `UserRepository` interface in the `repository` package:
+
+```java
+package com.example.bankingapp.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import com.example.bankingapp.model.User;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    User findByUsername(String username);
+}
+```
+
+This repository interface will allow you to perform CRUD operations on the `User` entity and query users by their username.
+
+**Project Structure:**
+
+Here is an overview of the project structure with the relevant files:
+
+```
+src
+├── main
+│   ├── java
+│   │   └── com
+│   │       └── example
+│   │           └── bankingapp
+│   │               ├── controller
+│   │               │   └── AuthController.java
+│   │               ├── model
+│   │               │   └── User.java
+│   │               ├── repository
+│   │               │   └── UserRepository.java
+│   │               ├── security
+│   │               │   ├── CustomUserDetailsService.java
+│   │               │   └── SecurityConfig.java
+│   │               └── BankingAppApplication.java
+│   └── resources
+│       ├── application.properties
+│       └── templates
+│           ├── login.html
+│           └── main.html
+└── test
+    └── java
+        └── com
+            └── example
+                └── bankingapp
+                    └── BankingAppApplicationTests.java
+```
+
+**Explanation:**
+
+- `model`: Contains the `User` entity class.
+- `repository`: Contains the `UserRepository` interface.
+- `controller`: Contains the `AuthController` class to handle registration and user details.
+- `security`: Contains security configurations and user details service.
+- `resources/application.properties`: Configuration properties for the Spring Boot application.
+
+With this setup, you can now proceed to implement the rest of your Spring Boot application and React frontend as previously described. The `User` entity is defined, and its repository is ready for use in the authentication process.
