@@ -1,57 +1,105 @@
-To search for questions in a local document using Python and Haystack, you can follow these steps:
+Certainly! Here's a complete example in a single Python file that demonstrates indexing documents and retrieving answers based on user queries using `whoosh`:
 
-1. **Install Haystack**: First, make sure you have Haystack installed. You can install it via pip if you haven't already:
-   ```bash
-   pip install farm-haystack
-   ```
+```python
+# Import necessary libraries
+import os
+from whoosh.index import create_in, open_dir
+from whoosh.fields import Schema, TEXT, ID
+from whoosh.qparser import QueryParser
+from nltk import word_tokenize
+from nltk.corpus import stopwords
+import nltk
 
-2. **Prepare your Document**: Place your document (e.g., a PDF, Word document, or text file) in a directory where your script can access it.
+# Define NLTK downloads for tokenization and stopwords
+nltk.download('punkt')
+nltk.download('stopwords')
 
-3. **Create a Python Script**: Here’s a basic example of how to search for questions using Haystack:
+# Define a function to process user queries
+def process_query(query):
+    tokens = word_tokenize(query.lower())
+    stop_words = set(stopwords.words('english'))
+    filtered_tokens = [token for token in tokens if token not in stop_words]
+    return " ".join(filtered_tokens)
 
-   ```python
-   from haystack import Finder
-   from haystack.document_store.faiss import FAISSDocumentStore
-   from haystack.retriever.dense import DensePassageRetriever
-   from haystack.reader.farm import FARMReader
-   from haystack.utils import print_answers
+# Define a function to index documents
+def index_documents():
+    # Define schema for the index
+    schema = Schema(title=TEXT(stored=True), content=TEXT(stored=True))
+    
+    # Create or open an index directory
+    index_dir = "indexdir"
+    if not os.path.exists(index_dir):
+        os.mkdir(index_dir)
+    
+    # Create an index writer
+    ix = create_in(index_dir, schema)
+    writer = ix.writer()
+    
+    # Add documents to the index
+    writer.add_document(title=u"Document 1", content=u"This is the content of document 1.")
+    writer.add_document(title=u"Document 2", content=u"This is the content of document 2.")
+    # Add more documents as needed
+    
+    # Commit changes and close the writer
+    writer.commit()
 
-   # Initialize document store
-   document_store = FAISSDocumentStore()
+# Define a function to search documents based on user query
+def search_documents(user_query):
+    # Load the existing index
+    ix = open_dir("indexdir")
+    
+    # Query processing and retrieval
+    with ix.searcher() as searcher:
+        query_parser = QueryParser("content", ix.schema)
+        query = query_parser.parse(user_query)
+        results = searcher.search(query, limit=5)  # Limiting to 5 results for example
+        
+        # Process and return results
+        if len(results) > 0:
+            return [hit['content'] for hit in results]
+        else:
+            return ["Sorry, I couldn't find any relevant information."]
 
-   # Add documents to document store
-   document_store.add_eval_data(
-       filename="path/to/your/document.pdf",
-       doc_index="document",
-       doc_source="local"
-   )
+# Main function to demonstrate usage
+def main():
+    # Index documents (run once to create the index)
+    index_documents()
+    
+    # Example user query
+    user_query = "benefits of machine learning"
+    processed_query = process_query(user_query)
+    
+    # Search documents based on processed query
+    results = search_documents(processed_query)
+    
+    # Display results
+    print("Query:", user_query)
+    print("Processed Query:", processed_query)
+    print("Results:")
+    for result in results:
+        print("-", result)
 
-   # Initialize retriever and reader
-   retriever = DensePassageRetriever(document_store=document_store)
-   reader = FARMReader(model_name_or_path="deepset/bert-base-cased-squad2")
+# Execute main function if this script is run directly
+if __name__ == "__main__":
+    main()
+```
 
-   # Initialize Finder
-   finder = Finder(reader, retriever)
+### Explanation:
 
-   # Define your question
-   question = "What is the capital of France?"
+1. **Imports and NLTK Setup**: Import necessary libraries (`os`, `whoosh`, `nltk`) and download NLTK resources (`punkt` for tokenization, `stopwords` for removing common words).
+   
+2. **`process_query` Function**: Tokenizes user queries and removes stopwords to prepare them for document search.
 
-   # Perform the search
-   prediction = finder.get_answers(question=question, top_k_retriever=10, top_k_reader=5)
+3. **`index_documents` Function**: Sets up document indexing using `whoosh`. Creates an index directory if it doesn't exist, defines a schema for indexing (`title` and `content` fields), adds example documents (`Document 1` and `Document 2`), and commits changes to the index.
 
-   # Print out answers
-   print_answers(prediction, details="minimal")
-   ```
+4. **`search_documents` Function**: Searches indexed documents based on processed user queries. It opens the existing index (`indexdir`), parses user queries using `QueryParser`, executes the query using `searcher.search`, and retrieves content from matching documents.
 
-4. **Explanation**:
-   - **Document Store**: Uses `FAISSDocumentStore` for storing and retrieving documents.
-   - **Add Document**: Add your local document using `add_eval_data()`, specifying the file path and index name.
-   - **Retriever**: Use `DensePassageRetriever` for retrieving relevant passages from the document.
-   - **Reader**: Use `FARMReader` for reading and extracting answers from retrieved passages.
-   - **Finder**: Combines the retriever and reader to find answers to your question.
-   - **Search**: Use `get_answers()` method to search for answers to your question.
-   - **Print Answers**: Display the answers found.
+5. **`main` Function**: Demonstrates the complete workflow by indexing documents once (`index_documents`) and then performing a search (`search_documents`) based on an example user query (`"benefits of machine learning"`).
 
-5. **Run the Script**: Save the script in a Python file and execute it. Ensure you have the necessary models downloaded and dependencies installed as per Haystack's requirements.
+### Usage:
 
-This script is a basic example and can be customized further based on your specific needs, such as using different retrievers or readers, handling multiple documents, or refining the search process. Adjust the paths, models, and parameters according to your setup and requirements.
+- **Setup**: Run the script to index documents (`index_documents` function runs once to create the index).
+  
+- **Querying**: Modify `user_query` in the `main` function to test different queries. Processed queries are displayed along with retrieved results.
+
+This example provides a comprehensive single-file implementation using Python and `whoosh` for indexing and searching documents based on user queries. Adjustments can be made for specific document structures, query handling, and deployment needs.
