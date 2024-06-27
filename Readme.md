@@ -254,3 +254,34 @@ rasa shell
 Now, your Rasa bot should be able to answer questions based on the content of the `document.txt` file using Haystack for document search. Adjust the configurations and scripts as per your specific use case and requirements.
 
 This setup ensures compatibility with Rasa 3.1 and utilizes Haystack for efficient document retrieval and answering within your chatbot application.
+from haystack import Finder
+from haystack.document_store.faiss import FAISSDocumentStore
+from haystack.retriever.dense import DensePassageRetriever
+from haystack.reader.farm import FARMReader
+from haystack.utils import print_answers
+
+# Initialize document store
+document_store = FAISSDocumentStore()
+
+# Add documents to document store
+document_store.add_eval_data(
+    filename="path/to/your/document.pdf",
+    doc_index="document",
+    doc_source="local"
+)
+
+# Initialize retriever and reader
+retriever = DensePassageRetriever(document_store=document_store)
+reader = FARMReader(model_name_or_path="deepset/bert-base-cased-squad2")
+
+# Initialize Finder
+finder = Finder(reader, retriever)
+
+# Define your question
+question = "What is the capital of France?"
+
+# Perform the search
+prediction = finder.get_answers(question=question, top_k_retriever=10, top_k_reader=5)
+
+# Print out answers
+print_answers(prediction, details="minimal")
