@@ -1,105 +1,142 @@
-Certainly! Here's a complete example in a single Python file that demonstrates indexing documents and retrieving answers based on user queries using `whoosh`:
+Certainly! Below is an example of how you can create a form to book a flight in Rasa. This includes updates to the `domain.yml`, `data/stories.yml`, `data/rules.yml`, and `actions.py` files.
 
-```python
-# Import necessary libraries
-import os
-from whoosh.index import create_in, open_dir
-from whoosh.fields import Schema, TEXT, ID
-from whoosh.qparser import QueryParser
-from nltk import word_tokenize
-from nltk.corpus import stopwords
-import nltk
+### 1. `domain.yml`
 
-# Define NLTK downloads for tokenization and stopwords
-nltk.download('punkt')
-nltk.download('stopwords')
+```yaml
+version: "3.0"
 
-# Define a function to process user queries
-def process_query(query):
-    tokens = word_tokenize(query.lower())
-    stop_words = set(stopwords.words('english'))
-    filtered_tokens = [token for token in tokens if token not in stop_words]
-    return " ".join(filtered_tokens)
+intents:
+  - book_flight
+  - inform
 
-# Define a function to index documents
-def index_documents():
-    # Define schema for the index
-    schema = Schema(title=TEXT(stored=True), content=TEXT(stored=True))
-    
-    # Create or open an index directory
-    index_dir = "indexdir"
-    if not os.path.exists(index_dir):
-        os.mkdir(index_dir)
-    
-    # Create an index writer
-    ix = create_in(index_dir, schema)
-    writer = ix.writer()
-    
-    # Add documents to the index
-    writer.add_document(title=u"Document 1", content=u"This is the content of document 1.")
-    writer.add_document(title=u"Document 2", content=u"This is the content of document 2.")
-    # Add more documents as needed
-    
-    # Commit changes and close the writer
-    writer.commit()
+entities:
+  - departure_city
+  - destination_city
+  - travel_date
+  - number_of_passengers
 
-# Define a function to search documents based on user query
-def search_documents(user_query):
-    # Load the existing index
-    ix = open_dir("indexdir")
-    
-    # Query processing and retrieval
-    with ix.searcher() as searcher:
-        query_parser = QueryParser("content", ix.schema)
-        query = query_parser.parse(user_query)
-        results = searcher.search(query, limit=5)  # Limiting to 5 results for example
-        
-        # Process and return results
-        if len(results) > 0:
-            return [hit['content'] for hit in results]
-        else:
-            return ["Sorry, I couldn't find any relevant information."]
+slots:
+  departure_city:
+    type: text
+  destination_city:
+    type: text
+  travel_date:
+    type: text
+  number_of_passengers:
+    type: text
 
-# Main function to demonstrate usage
-def main():
-    # Index documents (run once to create the index)
-    index_documents()
-    
-    # Example user query
-    user_query = "benefits of machine learning"
-    processed_query = process_query(user_query)
-    
-    # Search documents based on processed query
-    results = search_documents(processed_query)
-    
-    # Display results
-    print("Query:", user_query)
-    print("Processed Query:", processed_query)
-    print("Results:")
-    for result in results:
-        print("-", result)
+forms:
+  flight_booking_form:
+    required_slots:
+      - departure_city
+      - destination_city
+      - travel_date
+      - number_of_passengers
 
-# Execute main function if this script is run directly
-if __name__ == "__main__":
-    main()
+responses:
+  utter_ask_departure_city:
+    - text: "From which city are you departing?"
+  utter_ask_destination_city:
+    - text: "What is your destination city?"
+  utter_ask_travel_date:
+    - text: "On what date would you like to travel?"
+  utter_ask_number_of_passengers:
+    - text: "How many passengers are traveling?"
+  utter_submit:
+    - text: "Thank you! You are booking a flight from {departure_city} to {destination_city} on {travel_date} for {number_of_passengers} passengers."
+
+actions:
+  - action_submit
 ```
 
-### Explanation:
+### 2. `data/stories.yml`
 
-1. **Imports and NLTK Setup**: Import necessary libraries (`os`, `whoosh`, `nltk`) and download NLTK resources (`punkt` for tokenization, `stopwords` for removing common words).
-   
-2. **`process_query` Function**: Tokenizes user queries and removes stopwords to prepare them for document search.
+```yaml
+version: "3.0"
 
-3. **`index_documents` Function**: Sets up document indexing using `whoosh`. Creates an index directory if it doesn't exist, defines a schema for indexing (`title` and `content` fields), adds example documents (`Document 1` and `Document 2`), and commits changes to the index.
+stories:
+- story: book a flight
+  steps:
+    - intent: book_flight
+    - action: flight_booking_form
+    - active_loop: flight_booking_form
+    - slot_was_set:
+        - requested_slot: departure_city
+    - slot_was_set:
+        - requested_slot: destination_city
+    - slot_was_set:
+        - requested_slot: travel_date
+    - slot_was_set:
+        - requested_slot: number_of_passengers
+    - action: action_submit
+```
 
-4. **`search_documents` Function**: Searches indexed documents based on processed user queries. It opens the existing index (`indexdir`), parses user queries using `QueryParser`, executes the query using `searcher.search`, and retrieves content from matching documents.
+### 3. `data/rules.yml`
 
-5. **`main` Function**: Demonstrates the complete workflow by indexing documents once (`index_documents`) and then performing a search (`search_documents`) based on an example user query (`"benefits of machine learning"`).
+```yaml
+version: "3.0"
 
-### Usage:
+rules:
+- rule: Activate flight booking form
+  steps:
+    - intent: book_flight
+    - action: flight_booking_form
+    - active_loop: flight_booking_form
 
-- **Setup**: Run the script to index documents (`index_documents` function runs once to create the index).
-  
-- **Querying**: Modify `user_query` in the `main` function to test different queries. Processed queries are displayed along with retrieved results.
+- rule: Submit flight booking form
+  condition:
+    - active_loop: flight_booking_form
+  steps:
+    - action: flight_booking_form
+    - active_loop: null
+    - action: action_submit
+```
 
-This example provides a comprehensive single-file implementation using Python and `whoosh` for indexing and searching documents based on user queries. Adjustments can be made for specific document structures, query handling, and deployment needs.
+### 4. `actions.py`
+
+Create a custom action to handle the submission of the form:
+
+```python
+# actions.py
+
+from typing import Any, Text, Dict, List
+
+from rasa_sdk import Action, Tracker
+from rasa_sdk.executor import CollectingDispatcher
+from rasa_sdk.events import SlotSet
+
+class ActionSubmit(Action):
+
+    def name(self) -> Text:
+        return "action_submit"
+
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        departure_city = tracker.get_slot('departure_city')
+        destination_city = tracker.get_slot('destination_city')
+        travel_date = tracker.get_slot('travel_date')
+        number_of_passengers = tracker.get_slot('number_of_passengers')
+
+        dispatcher.utter_message(text=f"Thank you! You are booking a flight from {departure_city} to {destination_city} on {travel_date} for {number_of_passengers} passengers.")
+
+        return []
+```
+
+### 5. Training and Running the Bot
+
+After making these changes, train your model:
+
+```bash
+rasa train
+```
+
+Then, you can run your action server and your Rasa server:
+
+```bash
+rasa run actions
+rasa run
+```
+
+This setup should allow your Rasa bot to handle a simple flight booking conversation using a form.
