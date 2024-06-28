@@ -195,4 +195,165 @@ rasa run
 ```
 
 Now your bot should be able to handle the flight booking conversation, including recognizing the necessary intents and entities.
+Providing custom entity extraction logic in Rasa involves creating a custom component that processes user messages and extracts entities. This custom component can be added to the NLU pipeline. Here’s a step-by-step guide:
 
+### 1. Create a Custom Component
+
+First, create a Python file for your custom component. For example, let's name it `custom_entity_extractor.py`.
+
+#### `custom_entity_extractor.py`
+
+```python
+from typing import Any, Dict, List, Text
+
+from rasa.nlu.components import Component
+from rasa.nlu.extractors.extractor import EntityExtractor
+from rasa.nlu.training_data import Message, TrainingData
+from rasa.engine.recipes.default_recipe import DefaultV1Recipe
+from rasa.engine.graph import GraphComponent
+from rasa.shared.nlu.constants import ENTITIES, TEXT
+
+import re
+
+@DefaultV1Recipe.register([GraphComponent], is_trainable=False)
+class CustomEntityExtractor(EntityExtractor, Component):
+    @classmethod
+    def required_components(cls) -> List[Type[Component]]:
+        return []
+
+    @classmethod
+    def create(
+        cls, config: Dict[Text, Any], model_storage: ModelStorage, resource: Resource
+    ) -> CustomEntityExtractor:
+        return cls()
+
+    def process(self, messages: List[Message], **kwargs: Any) -> None:
+        for message in messages:
+            self.extract_entities(message)
+
+    def extract_entities(self, message: Message) -> None:
+        text = message.get(TEXT)
+
+        # Define patterns for entities
+        amount_pattern = re.compile(r"\b\d+\b")
+        userid_pattern = re.compile(r"\buser\d+\b|\bid\d+\b|\b[a-zA-Z_]+\d*\b")
+        account_number_pattern = re.compile(r"\b\d{10}\b")
+
+        entities = []
+
+        # Extract amount
+        for match in re.finditer(amount_pattern, text):
+            entities.append({
+                "start": match.start(),
+                "end": match.end(),
+                "value": match.group(),
+                "entity": "amount",
+                "confidence": 1.0
+            })
+
+        # Extract user ID
+        for match in re.finditer(userid_pattern, text):
+            entities.append({
+                "start": match.start(),
+                "end": match.end(),
+                "value": match.group(),
+                "entity": "userid",
+                "confidence": 1.0
+            })
+
+        # Extract account number
+        for match in re.finditer(account_number_pattern, text):
+            entities.append({
+                "start": match.start(),
+                "end": match.end(),
+                "value": match.group(),
+                "entity": "account_number",
+                "confidence": 1.0
+            })
+
+        message.set(ENTITIES, message.get(ENTITIES, []) + entities)
+```
+
+### 2. Add the Custom Component to Your NLU Pipeline
+
+Modify your `config.yml` to include the custom entity extractor in the NLU pipeline.
+
+#### `config.yml`
+
+```yaml
+language: en
+
+pipeline:
+  - name: WhitespaceTokenizer
+  - name: RegexFeaturizer
+  - name: LexicalSyntacticFeaturizer
+  - name: CountVectorsFeaturizer
+  - name: DIETClassifier
+    epochs: 100
+  - name: custom_entity_extractor.CustomEntityExtractor
+  - name: EntitySynonymMapper
+  - name: ResponseSelector
+    epochs: 100
+```
+
+### 3. Update Your Training Data
+
+Ensure your training data includes enough examples for the custom entity extractor to work effectively.
+
+#### `data/nlu.yml`
+
+```yaml
+version: "3.0"
+
+nlu:
+- intent: provide_amount
+  examples: |
+    - The amount is 500
+    - I need to transfer 2500
+    - Transfer 1000 dollars
+    - Send 300
+    - 1500
+    - 450
+
+- intent: provide_userid
+  examples: |
+    - My user ID is user123
+    - The user ID is abc789
+    - user456
+    - id1234
+    - User ID: john_doe
+
+- intent: provide_account_number
+  examples: |
+    - The account number is 1234567890
+    - Account number: 9876543210
+    - 1122334455
+    - My account number is 1234509876
+    - 6789012345
+```
+
+### 4. Train and Run Your Rasa Bot
+
+1. **Train your model:**
+
+```bash
+rasa train
+```
+
+2. **Run your action server and Rasa server:**
+
+```bash
+rasa run actions
+rasa run
+```
+
+### Example Interaction
+
+1. **User:** I need to transfer 500.
+2. **Bot:** What is your user ID?
+3. **User:** user123.
+4. **Bot:** What is the account number?
+5. **User:** 1234567890.
+6. **Bot:** Thank you! You are transferring 500 from user ID user123 to account number 1234567890.
+
+With this setup, the custom entity extractor should accurately extract `amount`, `userid`, and `account_number` from the user’s input, reducing confusion and ensuring correct slot filling. Adjust the regex patterns and logic in `custom_entity_extractor.py` as needed based on the specific formats of your entities.
