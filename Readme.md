@@ -140,3 +140,59 @@ rasa run
 ```
 
 This setup should allow your Rasa bot to handle a simple flight booking conversation using a form.
+Yes, you are correct. We need to update the `nlu.yml` file to include the necessary intents and examples that the bot will recognize and use to trigger the flight booking form. Here is how you can update the `nlu.yml` file:
+
+### 6. `data/nlu.yml`
+
+```yaml
+version: "3.0"
+
+nlu:
+- intent: book_flight
+  examples: |
+    - I want to book a flight
+    - Book a flight for me
+    - Can you help me book a flight?
+    - I need to book a flight
+    - Help me book a flight
+    - I would like to book a flight
+
+- intent: inform
+  examples: |
+    - I am departing from [New York](departure_city)
+    - My destination is [London](destination_city)
+    - I will travel on [July 10th](travel_date)
+    - I need tickets for [3](number_of_passengers) passengers
+    - Departure city is [Los Angeles](departure_city)
+    - Destination city is [Paris](destination_city)
+    - The travel date is [August 15th](travel_date)
+    - [4](number_of_passengers) people are traveling
+    - From [Chicago](departure_city) to [Tokyo](destination_city) on [September 5th](travel_date)
+    - I need a flight for [2](number_of_passengers) people on [December 1st](travel_date)
+```
+
+### Recap of All Files
+
+1. `domain.yml`
+2. `data/stories.yml`
+3. `data/rules.yml`
+4. `data/nlu.yml`
+5. `actions.py`
+
+### Training and Running the Bot
+
+After updating the `nlu.yml` file, you should retrain your model:
+
+```bash
+rasa train
+```
+
+Then, run your action server and your Rasa server:
+
+```bash
+rasa run actions
+rasa run
+```
+
+Now your bot should be able to handle the flight booking conversation, including recognizing the necessary intents and entities.
+
