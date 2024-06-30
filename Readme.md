@@ -146,3 +146,104 @@ stories:
 3. **Stories**: Stories guide the conversation, handling each step and validation, ensuring the correct slot is filled based on the context provided by `requested_slot`.
 
 This setup ensures that when the bot asks for the amount and the user responds with "5", it will correctly recognize and set the amount slot, leveraging the context provided by `requested_slot`.
+
+Sure, here are the `domain.yml` and `nlu.yml` files updated with the necessary intents, entities, slots, responses, and training examples.
+
+### `domain.yml`
+
+```yaml
+version: "3.1"
+
+intents:
+  - request_transaction
+  - inform
+
+entities:
+  - amount
+  - account_number
+  - vendor_name
+  - user_id
+
+slots:
+  amount:
+    type: float
+    influence_conversation: false
+  account_number:
+    type: text
+    influence_conversation: false
+  vendor_name:
+    type: text
+    influence_conversation: false
+  user_id:
+    type: text
+    influence_conversation: false
+  requested_slot:
+    type: unfeaturized
+
+responses:
+  utter_ask_amount:
+    - text: "Please provide the amount you wish to transfer."
+  utter_ask_account_number:
+    - text: "What is the account number?"
+  utter_ask_vendor_name:
+    - text: "Who is the vendor?"
+  utter_ask_user_id:
+    - text: "Please provide your user ID."
+  utter_transaction_details:
+    - text: "Transaction details: \nAmount: {amount}\nAccount Number: {account_number}\nVendor Name: {vendor_name}\nUser ID: {user_id}"
+
+actions:
+  - action_submit_transaction
+  - action_ask_amount
+  - action_ask_account_number
+  - action_ask_vendor_name
+  - action_ask_user_id
+  - validate_transaction_slot
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true
+```
+
+### `nlu.yml`
+
+```yaml
+version: "3.1"
+
+nlu:
+- intent: request_transaction
+  examples: |
+    - I want to make a transaction
+    - I need to transfer money
+    - Can you help me with a transaction?
+    - I want to send money
+    - I'd like to transfer funds
+
+- intent: inform
+  examples: |
+    - The amount is [750](amount)
+    - My account number is [123456789](account_number)
+    - The vendor name is [Amazon](vendor_name)
+    - My user ID is [1](user_id)
+    - Please transfer [5](amount) dollars
+    - The account number is [987654321](account_number)
+    - Vendor is [BestBuy](vendor_name)
+    - User ID is [A](user_id)
+    - [500](amount)
+    - [10](amount)
+    - [300](amount)
+    - [456789123](account_number)
+    - [Walmart](vendor_name)
+    - [B](user_id)
+```
+
+### Explanation
+
+1. **Intents**: `request_transaction` for starting a transaction and `inform` for providing information like amount, account number, vendor name, and user ID.
+2. **Entities**: Defined entities for `amount`, `account_number`, `vendor_name`, and `user_id`.
+3. **Slots**: Slots to store the values of these entities and a `requested_slot` to manage which slot is being requested.
+4. **Responses**: Utterances for asking each piece of information and for summarizing the transaction details.
+5. **Actions**: Actions for asking each piece of information and for validating and submitting the transaction.
+6. **NLU Examples**: Training examples for the intents, with entities annotated. This includes simple responses like "5" or "750" to ensure the model can recognize numerical inputs correctly.
+
+With this setup, when the bot asks for an amount and the user responds with a numerical value like "5", it will recognize it as the amount and proceed accordingly.
