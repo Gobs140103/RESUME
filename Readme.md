@@ -1,84 +1,122 @@
-Yes, Dynatrace can be used with an API deployed on Amazon ECS (Elastic Container Service). Dynatrace provides comprehensive monitoring for containerized applications running on AWS ECS, including visibility into the performance and health of your services.
+Creating an advanced receipt parser without using Tesseract involves relying solely on deep learning and NER (Named Entity Recognition) techniques. Here’s a structured approach and snippets of code to guide you through the process using Python:
 
-### Steps to Integrate Dynatrace with Amazon ECS
+### Steps to Create an Advanced Receipt Parser without Tesseract
 
-1. **Sign up for Dynatrace**:
-   - If you don’t have a Dynatrace account, sign up at the [Dynatrace website](https://www.dynatrace.com/).
+#### Step 1: Data Collection and Annotation
 
-2. **Set up a Dynatrace Environment**:
-   - Create a new environment in the Dynatrace web interface if you don't have one already.
+1. **Collect Receipt Images**: Gather a diverse set of receipt images. Ensure they cover different layouts, fonts, and styles.
 
-3. **Install the Dynatrace OneAgent**:
-   - You need to install the Dynatrace OneAgent on the EC2 instances running your ECS containers. The OneAgent can automatically detect and monitor all applications running on your instances, including your ECS tasks.
+2. **Annotation**: Annotate these receipts to mark fields such as date, merchant name, total amount, items purchased, etc. You can use tools like LabelImg or manually create annotations.
 
-   - **Automated Setup with ECS Integration**:
-     - Dynatrace offers a simplified setup process to deploy the OneAgent on ECS using the ECS integration. Here’s how you can do it:
-     
-       - Navigate to `Deploy Dynatrace` in the Dynatrace menu and select `Set up monitoring`.
-       - Choose `Amazon Web Services` and then `Amazon ECS`.
-       - Follow the instructions provided by Dynatrace to deploy the OneAgent. You might need to use AWS CloudFormation to set up the necessary IAM roles, policies, and resources.
+#### Step 2: Preprocessing
 
-   - **Manual Setup**:
-     - Alternatively, you can manually deploy the OneAgent using ECS task definitions. Here’s a brief outline:
-       - Download the OneAgent installer script from Dynatrace.
-       - Create a new ECS Task Definition that includes the OneAgent container.
-       - Ensure the task definition specifies the necessary environment variables and volume mounts for the OneAgent.
+1. **Image Preprocessing**: Resize, normalize, and enhance contrast of receipt images to improve OCR performance.
 
-     Example of a task definition snippet for the OneAgent container:
+2. **Text Extraction**: Use a deep learning approach to directly extract text from images. This can be achieved using models like CRNN (Convolutional Recurrent Neural Network).
 
-     ```json
-     {
-       "name": "dynatrace-oneagent",
-       "image": "dynatrace/oneagent",
-       "essential": true,
-       "environment": [
-         {
-           "name": "ONEAGENT_INSTALLER_SCRIPT_URL",
-           "value": "https://<your-environment-id>.live.dynatrace.com/api/v1/deployment/installer/agent/unix/default/latest?Api-Token=<your-api-token>"
-         }
-       ],
-       "mountPoints": [
-         {
-           "sourceVolume": "dynatrace",
-           "containerPath": "/opt/dynatrace/oneagent",
-           "readOnly": false
-         }
-       ]
-     }
-     ```
+#### Step 3: Model Architecture
 
-     You also need to define a volume in the ECS task definition:
+1. **NER Model**: Utilize a pre-trained NER model like BERT or train a custom NER model using deep learning frameworks like TensorFlow or PyTorch.
 
-     ```json
-     {
-       "volumes": [
-         {
-           "name": "dynatrace",
-           "host": {
-             "sourcePath": "/opt/dynatrace/oneagent"
-           }
-         }
-       ]
-     }
-     ```
+2. **Sequence Labeling**: Implement a sequence labeling approach (e.g., BiLSTM-CRF) to tag each token (word or part of a word) with its corresponding entity (e.g., DATE, AMOUNT, ITEM, etc.).
 
-4. **Configure Dynatrace for ECS Monitoring**:
-   - After deploying the OneAgent, configure Dynatrace to monitor ECS services:
-     - Ensure ECS integration is enabled in Dynatrace.
-     - Configure service detection rules and tagging in Dynatrace to identify and group your ECS services.
+#### Step 4: Training the Model
 
-5. **Monitor and Analyze**:
-   - Once the OneAgent is deployed and configured, you can start monitoring your ECS services.
-   - Dynatrace provides dashboards, alerts, and AI-driven insights to help you understand the performance and health of your applications.
+1. **Data Preparation**: Split annotated data into training, validation, and test sets.
 
-### Additional Tips
+2. **Feature Extraction**: Use image embeddings or features extracted from CNN (Convolutional Neural Network) layers for image text extraction.
 
-- **AWS CloudWatch Integration**:
-  - Integrate Dynatrace with AWS CloudWatch for additional metrics and logs.
-  - This can provide a more comprehensive view of your infrastructure and application performance.
+3. **Model Training**: Train the NER model on the annotated dataset. Fine-tune a pre-trained NER model on your specific receipt data to improve accuracy.
 
-- **Security Considerations**:
-  - Ensure the IAM roles and policies for Dynatrace OneAgent have the least privileges necessary to function.
-  - Secure API tokens and other credentials used by Dynatrace.
+#### Step 5: Integration and Parsing
 
-By following these steps, you can effectively monitor and manage the performance of your API deployed on Amazon ECS using Dynatrace.
+1. **JSON Output**: Parse the text extracted from images using the trained NER model to extract relevant fields (date, merchant, total amount, items purchased) and format them into a JSON structure.
+
+### Example Code Snippets
+
+Here are simplified snippets to illustrate key parts of the implementation:
+
+#### Example Image Text Extraction
+
+```python
+# Example using a deep learning model (CRNN) for text extraction from receipt images
+import tensorflow as tf
+from tensorflow.keras import layers
+
+# Define a CRNN model for text extraction from images
+model = tf.keras.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(height, width, channels)),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(num_classes, activation='softmax')
+])
+
+# Train the model on your dataset
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+model.fit(train_images, train_labels, epochs=10, validation_data=(val_images, val_labels))
+
+# Use the trained model to extract text from receipt images
+extracted_text = model.predict(test_images)
+```
+
+#### Example NER Model Training and Usage
+
+```python
+import spacy
+from spacy.training.example import Example
+
+# Load a pre-trained SpaCy model for NER
+nlp = spacy.load('en_core_web_sm')
+
+# Example training loop for custom NER
+for epoch in range(10):
+    for text, annotations in annotated_data:
+        doc = nlp.make_doc(text)
+        example = Example.from_dict(doc, annotations)
+        nlp.update([example], losses={})
+
+# Save the trained NER model
+nlp.to_disk('path_to_save_model')
+
+# Use the trained model to extract entities from text
+doc = nlp("Text extracted from receipt image")
+for ent in doc.ents:
+    print(ent.text, ent.label_)
+```
+
+#### Example JSON Output
+
+```python
+import json
+
+# Example of parsing and formatting extracted entities into JSON
+parsed_data = {
+    "merchant": "ABC Store",
+    "date": "2024-07-05",
+    "total_amount": "$50.00",
+    "items": [
+        {"name": "Item 1", "quantity": 1, "price": "$10.00"},
+        {"name": "Item 2", "quantity": 2, "price": "$20.00"}
+    ]
+}
+
+# Convert to JSON
+json_data = json.dumps(parsed_data, indent=2)
+print(json_data)
+```
+
+### Notes
+
+- **Complexity**: Implementing an advanced receipt parser without Tesseract requires expertise in deep learning, NER techniques, and handling diverse receipt formats.
+  
+- **Customization**: Adapt the steps and models according to your specific receipt layout and data requirements.
+  
+- **Evaluation**: Evaluate the performance of your models using metrics like precision, recall, and F1-score on a separate test dataset.
+
+This approach combines deep learning for image text extraction and NER for structured data extraction, providing a robust solution for receipt parsing without relying on OCR libraries like Tesseract.
