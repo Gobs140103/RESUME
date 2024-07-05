@@ -1,39 +1,47 @@
-To perform image processing and OCR using OpenCV and EasyOCR, and then save the output in a text file, follow these steps:
+To perform OCR (Optical Character Recognition) on an image using pytesseract, you can follow these steps. pytesseract is a Python wrapper for Google's Tesseract-OCR Engine, which is widely used for OCR tasks. Here's a step-by-step guide on how to perform image OCR using pytesseract:
 
 ### Step-by-Step Implementation
 
 #### Step 1: Install Required Libraries
 
-First, make sure you have OpenCV and EasyOCR installed:
+Ensure you have pytesseract and Pillow (PIL fork) installed:
 
 ```bash
-pip install opencv-python-headless easyocr
+pip install pytesseract Pillow
 ```
 
-#### Step 2: Perform Image Processing and OCR
+#### Step 2: Install Tesseract-OCR
 
-Here's a basic example of how to process an image, perform OCR using EasyOCR, and save the output to a text file.
+You also need to install Tesseract-OCR on your system. Instructions vary by operating system:
+
+- **For Windows**: Download the installer from the [Tesseract-OCR GitHub page](https://github.com/UB-Mannheim/tesseract/wiki).
+- **For macOS**: Install via Homebrew:
+  ```bash
+  brew install tesseract
+  ```
+- **For Linux (Ubuntu/Debian)**:
+  ```bash
+  sudo apt-get update
+  sudo apt-get install tesseract-ocr
+  ```
+
+#### Step 3: Perform OCR Using pytesseract
+
+Here’s an example Python script demonstrating how to perform OCR on an image using pytesseract:
 
 ```python
-import cv2
-import easyocr
-import os
+import pytesseract
+from PIL import Image
 
-# Function to perform OCR on an image using EasyOCR
+# Function to perform OCR on an image using pytesseract
 def perform_ocr(image_path):
-    # Initialize EasyOCR reader
-    reader = easyocr.Reader(['en'])  # Specify languages ('en' for English)
+    # Load image using Pillow (PIL)
+    img = Image.open(image_path)
 
-    # Read image using OpenCV
-    img = cv2.imread(image_path)
+    # Perform OCR using pytesseract
+    text = pytesseract.image_to_string(img)
 
-    # Convert image to grayscale (if necessary)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Perform OCR
-    results = reader.readtext(gray)
-
-    return results
+    return text
 
 # Example usage
 if __name__ == "__main__":
@@ -41,38 +49,55 @@ if __name__ == "__main__":
     image_path = 'path_to_your_image.jpg'
 
     # Perform OCR
-    ocr_results = perform_ocr(image_path)
+    ocr_text = perform_ocr(image_path)
 
-    # Print OCR results
-    for (bbox, text, prob) in ocr_results:
-        print(f'Text: {text} | Probability: {prob}')
-
-    # Save OCR output to a text file
-    output_file = 'output.txt'
-    with open(output_file, 'w', encoding='utf-8') as file:
-        for (bbox, text, prob) in ocr_results:
-            file.write(f'Text: {text} | Probability: {prob}\n')
-
-    print(f'OCR results saved to {output_file}')
+    # Print OCR result
+    print("OCR Text:")
+    print(ocr_text)
 ```
-
-#### Explanation:
-
-1. **Install Libraries**: Install OpenCV and EasyOCR using pip.
-
-2. **Perform OCR**: 
-   - `easyocr.Reader` initializes the EasyOCR reader with English language support ('en').
-   - `cv2.imread(image_path)` reads the image from the specified path.
-   - `reader.readtext(gray)` performs OCR on the grayscale image (`gray`) and returns results.
-
-3. **Save Output**: 
-   - Results are printed to the console and saved to a text file (`output.txt`).
-   - Each line in the text file contains the recognized text and its probability.
 
 ### Notes:
 
-- **Image Format**: Ensure the image format is supported by OpenCV (`jpg`, `png`, etc.).
-- **Output**: Adjust the output format and file handling as per your requirements.
-- **Error Handling**: Add error handling for file not found or OCR errors for robustness.
+- **Image Format**: Ensure the image (`jpg`, `png`, etc.) is in a format supported by Pillow.
+  
+- **Tesseract Path (Optional)**: If pytesseract cannot locate your Tesseract installation automatically, you may need to specify the path explicitly in your script:
+  ```python
+  pytesseract.pytesseract.tesseract_cmd = r'/usr/local/bin/tesseract'  # Example path for macOS/Linux
+  ```
+  
+- **Language Settings**: By default, pytesseract uses English (`eng`) for OCR. You can specify additional language(s) using the `lang` parameter:
+  ```python
+  text = pytesseract.image_to_string(img, lang='eng+fra')  # Example for English and French
+  ```
 
-This example provides a basic framework for performing OCR using OpenCV and EasyOCR, saving the output to a text file. Modify it according to your specific use case, such as handling multiple images or integrating further processing steps.
+- **Preprocessing**: For better OCR accuracy, you may need to preprocess the image (e.g., resizing, enhancing contrast) using Pillow before passing it to pytesseract.
+
+### Example Enhancing Image Contrast
+
+```python
+import pytesseract
+from PIL import Image, ImageEnhance
+
+# Function to enhance image contrast
+def enhance_image(image_path):
+    img = Image.open(image_path)
+    enhancer = ImageEnhance.Contrast(img)
+    enhanced_img = enhancer.enhance(2.0)  # Increase contrast (adjust as needed)
+    return enhanced_img
+
+# Example usage
+if __name__ == "__main__":
+    image_path = 'path_to_your_image.jpg'
+    
+    # Enhance image contrast
+    enhanced_image = enhance_image(image_path)
+    
+    # Perform OCR on enhanced image
+    ocr_text = pytesseract.image_to_string(enhanced_image)
+    
+    # Print OCR result
+    print("OCR Text:")
+    print(ocr_text)
+```
+
+This example demonstrates enhancing image contrast using Pillow's `ImageEnhance` module before performing OCR with pytesseract. Adjust the enhancement factor (`enhancer.enhance`) based on your image's characteristics for optimal OCR results.
