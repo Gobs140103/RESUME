@@ -1,122 +1,78 @@
-Creating an advanced receipt parser without using Tesseract involves relying solely on deep learning and NER (Named Entity Recognition) techniques. Here’s a structured approach and snippets of code to guide you through the process using Python:
+To perform image processing and OCR using OpenCV and EasyOCR, and then save the output in a text file, follow these steps:
 
-### Steps to Create an Advanced Receipt Parser without Tesseract
+### Step-by-Step Implementation
 
-#### Step 1: Data Collection and Annotation
+#### Step 1: Install Required Libraries
 
-1. **Collect Receipt Images**: Gather a diverse set of receipt images. Ensure they cover different layouts, fonts, and styles.
+First, make sure you have OpenCV and EasyOCR installed:
 
-2. **Annotation**: Annotate these receipts to mark fields such as date, merchant name, total amount, items purchased, etc. You can use tools like LabelImg or manually create annotations.
-
-#### Step 2: Preprocessing
-
-1. **Image Preprocessing**: Resize, normalize, and enhance contrast of receipt images to improve OCR performance.
-
-2. **Text Extraction**: Use a deep learning approach to directly extract text from images. This can be achieved using models like CRNN (Convolutional Recurrent Neural Network).
-
-#### Step 3: Model Architecture
-
-1. **NER Model**: Utilize a pre-trained NER model like BERT or train a custom NER model using deep learning frameworks like TensorFlow or PyTorch.
-
-2. **Sequence Labeling**: Implement a sequence labeling approach (e.g., BiLSTM-CRF) to tag each token (word or part of a word) with its corresponding entity (e.g., DATE, AMOUNT, ITEM, etc.).
-
-#### Step 4: Training the Model
-
-1. **Data Preparation**: Split annotated data into training, validation, and test sets.
-
-2. **Feature Extraction**: Use image embeddings or features extracted from CNN (Convolutional Neural Network) layers for image text extraction.
-
-3. **Model Training**: Train the NER model on the annotated dataset. Fine-tune a pre-trained NER model on your specific receipt data to improve accuracy.
-
-#### Step 5: Integration and Parsing
-
-1. **JSON Output**: Parse the text extracted from images using the trained NER model to extract relevant fields (date, merchant, total amount, items purchased) and format them into a JSON structure.
-
-### Example Code Snippets
-
-Here are simplified snippets to illustrate key parts of the implementation:
-
-#### Example Image Text Extraction
-
-```python
-# Example using a deep learning model (CRNN) for text extraction from receipt images
-import tensorflow as tf
-from tensorflow.keras import layers
-
-# Define a CRNN model for text extraction from images
-model = tf.keras.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(height, width, channels)),
-    layers.MaxPooling2D((2, 2)),
-    layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D((2, 2)),
-    layers.Flatten(),
-    layers.Dense(128, activation='relu'),
-    layers.Dense(num_classes, activation='softmax')
-])
-
-# Train the model on your dataset
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-
-model.fit(train_images, train_labels, epochs=10, validation_data=(val_images, val_labels))
-
-# Use the trained model to extract text from receipt images
-extracted_text = model.predict(test_images)
+```bash
+pip install opencv-python-headless easyocr
 ```
 
-#### Example NER Model Training and Usage
+#### Step 2: Perform Image Processing and OCR
+
+Here's a basic example of how to process an image, perform OCR using EasyOCR, and save the output to a text file.
 
 ```python
-import spacy
-from spacy.training.example import Example
+import cv2
+import easyocr
+import os
 
-# Load a pre-trained SpaCy model for NER
-nlp = spacy.load('en_core_web_sm')
+# Function to perform OCR on an image using EasyOCR
+def perform_ocr(image_path):
+    # Initialize EasyOCR reader
+    reader = easyocr.Reader(['en'])  # Specify languages ('en' for English)
 
-# Example training loop for custom NER
-for epoch in range(10):
-    for text, annotations in annotated_data:
-        doc = nlp.make_doc(text)
-        example = Example.from_dict(doc, annotations)
-        nlp.update([example], losses={})
+    # Read image using OpenCV
+    img = cv2.imread(image_path)
 
-# Save the trained NER model
-nlp.to_disk('path_to_save_model')
+    # Convert image to grayscale (if necessary)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-# Use the trained model to extract entities from text
-doc = nlp("Text extracted from receipt image")
-for ent in doc.ents:
-    print(ent.text, ent.label_)
+    # Perform OCR
+    results = reader.readtext(gray)
+
+    return results
+
+# Example usage
+if __name__ == "__main__":
+    # Path to your image file
+    image_path = 'path_to_your_image.jpg'
+
+    # Perform OCR
+    ocr_results = perform_ocr(image_path)
+
+    # Print OCR results
+    for (bbox, text, prob) in ocr_results:
+        print(f'Text: {text} | Probability: {prob}')
+
+    # Save OCR output to a text file
+    output_file = 'output.txt'
+    with open(output_file, 'w', encoding='utf-8') as file:
+        for (bbox, text, prob) in ocr_results:
+            file.write(f'Text: {text} | Probability: {prob}\n')
+
+    print(f'OCR results saved to {output_file}')
 ```
 
-#### Example JSON Output
+#### Explanation:
 
-```python
-import json
+1. **Install Libraries**: Install OpenCV and EasyOCR using pip.
 
-# Example of parsing and formatting extracted entities into JSON
-parsed_data = {
-    "merchant": "ABC Store",
-    "date": "2024-07-05",
-    "total_amount": "$50.00",
-    "items": [
-        {"name": "Item 1", "quantity": 1, "price": "$10.00"},
-        {"name": "Item 2", "quantity": 2, "price": "$20.00"}
-    ]
-}
+2. **Perform OCR**: 
+   - `easyocr.Reader` initializes the EasyOCR reader with English language support ('en').
+   - `cv2.imread(image_path)` reads the image from the specified path.
+   - `reader.readtext(gray)` performs OCR on the grayscale image (`gray`) and returns results.
 
-# Convert to JSON
-json_data = json.dumps(parsed_data, indent=2)
-print(json_data)
-```
+3. **Save Output**: 
+   - Results are printed to the console and saved to a text file (`output.txt`).
+   - Each line in the text file contains the recognized text and its probability.
 
-### Notes
+### Notes:
 
-- **Complexity**: Implementing an advanced receipt parser without Tesseract requires expertise in deep learning, NER techniques, and handling diverse receipt formats.
-  
-- **Customization**: Adapt the steps and models according to your specific receipt layout and data requirements.
-  
-- **Evaluation**: Evaluate the performance of your models using metrics like precision, recall, and F1-score on a separate test dataset.
+- **Image Format**: Ensure the image format is supported by OpenCV (`jpg`, `png`, etc.).
+- **Output**: Adjust the output format and file handling as per your requirements.
+- **Error Handling**: Add error handling for file not found or OCR errors for robustness.
 
-This approach combines deep learning for image text extraction and NER for structured data extraction, providing a robust solution for receipt parsing without relying on OCR libraries like Tesseract.
+This example provides a basic framework for performing OCR using OpenCV and EasyOCR, saving the output to a text file. Modify it according to your specific use case, such as handling multiple images or integrating further processing steps.
