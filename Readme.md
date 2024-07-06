@@ -1,266 +1,277 @@
-To perform OCR (Optical Character Recognition) on an image using pytesseract, you can follow these steps. pytesseract is a Python wrapper for Google's Tesseract-OCR Engine, which is widely used for OCR tasks. Here's a step-by-step guide on how to perform image OCR using pytesseract:
+To create a receipt parser that outputs the detailed JSON structure you provided, we will follow these steps:
 
-### Step-by-Step Implementation
+1. **OCR to extract text and layout information from the receipt image using PaddleOCR.**
+2. **NER model to identify and extract relevant entities from the OCR text.**
+3. **Combine OCR and NER results to structure the output JSON accordingly.**
 
-#### Step 1: Install Required Libraries
+Here’s a step-by-step guide, including the necessary code:
 
-Ensure you have pytesseract and Pillow (PIL fork) installed:
+### Step 1: Set Up the Environment
 
-```bash
-pip install pytesseract Pillow
-```
+1. **Install Required Libraries**:
 
-#### Step 2: Install Tesseract-OCR
-
-You also need to install Tesseract-OCR on your system. Instructions vary by operating system:
-
-- **For Windows**: Download the installer from the [Tesseract-OCR GitHub page](https://github.com/UB-Mannheim/tesseract/wiki).
-- **For macOS**: Install via Homebrew:
-  ```bash
-  brew install tesseract
-  ```
-- **For Linux (Ubuntu/Debian)**:
-  ```bash
-  sudo apt-get update
-  sudo apt-get install tesseract-ocr
-  ```
-
-#### Step 3: Perform OCR Using pytesseract
-
-Here’s an example Python script demonstrating how to perform OCR on an image using pytesseract:
-
-```python
-import pytesseract
-from PIL import Image
-
-# Function to perform OCR on an image using pytesseract
-def perform_ocr(image_path):
-    # Load image using Pillow (PIL)
-    img = Image.open(image_path)
-
-    # Perform OCR using pytesseract
-    text = pytesseract.image_to_string(img)
-
-    return text
-
-# Example usage
-if __name__ == "__main__":
-    # Path to your image file
-    image_path = 'path_to_your_image.jpg'
-
-    # Perform OCR
-    ocr_text = perform_ocr(image_path)
-
-    # Print OCR result
-    print("OCR Text:")
-    print(ocr_text)
-```
-
-### Notes:
-
-- **Image Format**: Ensure the image (`jpg`, `png`, etc.) is in a format supported by Pillow.
-  
-- **Tesseract Path (Optional)**: If pytesseract cannot locate your Tesseract installation automatically, you may need to specify the path explicitly in your script:
-  ```python
-  pytesseract.pytesseract.tesseract_cmd = r'/usr/local/bin/tesseract'  # Example path for macOS/Linux
-  ```
-  
-- **Language Settings**: By default, pytesseract uses English (`eng`) for OCR. You can specify additional language(s) using the `lang` parameter:
-  ```python
-  text = pytesseract.image_to_string(img, lang='eng+fra')  # Example for English and French
-  ```
-
-- **Preprocessing**: For better OCR accuracy, you may need to preprocess the image (e.g., resizing, enhancing contrast) using Pillow before passing it to pytesseract.
-
-### Example Enhancing Image Contrast
-
-```python
-import pytesseract
-from PIL import Image, ImageEnhance
-
-# Function to enhance image contrast
-def enhance_image(image_path):
-    img = Image.open(image_path)
-    enhancer = ImageEnhance.Contrast(img)
-    enhanced_img = enhancer.enhance(2.0)  # Increase contrast (adjust as needed)
-    return enhanced_img
-
-# Example usage
-if __name__ == "__main__":
-    image_path = 'path_to_your_image.jpg'
-    
-    # Enhance image contrast
-    enhanced_image = enhance_image(image_path)
-    
-    # Perform OCR on enhanced image
-    ocr_text = pytesseract.image_to_string(enhanced_image)
-    
-    # Print OCR result
-    print("OCR Text:")
-    print(ocr_text)
-```
-
-This example demonstrates enhancing image contrast using Pillow's `ImageEnhance` module before performing OCR with pytesseract. Adjust the enhancement factor (`enhancer.enhance`) based on your image's characteristics for optimal OCR results.
-
-
-Certainly! Here’s a comprehensive guide on how to annotate receipt text using `labelImg`, convert those annotations into a format suitable for training an NER model, and then train the model using spaCy. We'll cover the entire process from start to finish, including setting up, annotating, converting annotations, and training.
-
-### Step-by-Step Guide
-
-#### 1. Installing labelImg
-
-First, you need to install `labelImg`, an image annotation tool that we will adapt for text annotation:
-
-```bash
-pip install labelImg
-```
-
-#### 2. Setting Up and Annotating Receipts
-
-1. **Prepare Your Data**:
-   
-   Organize your receipt images and corresponding OCR-extracted text files (in `.txt` format) in a directory structure like this:
-
+   Create a `requirements.txt` file:
+   ```plaintext
+   paddlepaddle
+   paddleocr
+   spacy
+   numpy
+   pandas
+   opencv-python
    ```
-   receipts/
-   ├── image1.jpg
-   ├── image1.txt
-   ├── image2.jpg
-   ├── image2.txt
-   └── ...
-   ```
-
-   - Each `imageX.jpg` should be an image of a receipt.
-   - Each `imageX.txt` should contain the OCR-extracted text from `imageX.jpg`.
-
-2. **Run labelImg**:
-
-   Open `labelImg` and set it up to annotate the OCR-extracted text instead of objects in images:
-
+   Install the dependencies:
    ```bash
-   labelImg
+   pip install -r requirements.txt
    ```
 
-   - Click on "Open Dir" to select the directory containing your receipt images (`receipts/`).
-   - Navigate through the images and annotate the text regions directly on the images using bounding boxes.
-   - Label each bounding box with the corresponding entity type (e.g., TOTAL, DATE, ITEM, PRICE).
-
-   ![labelImg interface](https://github.com/tzutalin/labelImg/raw/master/demo/demo3.jpg)
-
-   - After annotating each image, click on "Save" to save the annotations. `labelImg` saves annotations in XML format (`imageX.xml` for each `imageX.jpg`).
-
-#### 3. Converting Annotations for Training
-
-After annotating your receipt images using `labelImg`, convert these annotations into a format suitable for training an NER model with spaCy.
-
-1. **Python Script to Convert Annotations**:
-
-   Use the following Python script to convert the XML annotations (`imageX.xml`) into a format required by spaCy for NER training:
-
-   ```python
-   import os
-   import xml.etree.ElementTree as ET
-
-   def convert_labelimg_to_spacy(data_dir):
-       train_data = []
-       for filename in os.listdir(data_dir):
-           if filename.endswith(".xml"):
-               xml_file = os.path.join(data_dir, filename)
-               image_file = os.path.splitext(xml_file)[0] + ".jpg"
-               
-               tree = ET.parse(xml_file)
-               root = tree.getroot()
-               
-               with open(image_file, 'r', encoding='utf-8') as f:
-                   text = f.read()
-               
-               entities = []
-               for obj in root.iter('object'):
-                   label = obj.find('name').text
-                   bbox = obj.find('bndbox')
-                   start = int(bbox.find('xmin').text)
-                   end = int(bbox.find('xmax').text)
-                   entities.append((start, end, label))
-               
-               train_data.append((text, {"entities": entities}))
-       
-       return train_data
-
-   # Example usage
-   data_dir = 'path/to/your/receipts'
-   train_data = convert_labelimg_to_spacy(data_dir)
-
-   # Save the train data for later use
-   with open('train_data.py', 'w', encoding='utf-8') as f:
-       f.write(f"TRAIN_DATA = {train_data}")
-   ```
-
-   - Replace `'path/to/your/receipts'` with the actual path to your directory containing the annotated images and XML files (`receipts/`).
-
-   - This script reads each annotated XML file, extracts the corresponding image (`imageX.jpg`), and creates a list of tuples `(text, {"entities": [(start, end, label), ...]})`.
-
-   - Save the generated `train_data.py` file, which contains the training data formatted for spaCy.
-
-#### 4. Training the NER Model with spaCy
-
-Finally, use spaCy to train an NER model using the converted training data (`train_data.py`).
-
-1. **Install spaCy and Requirements**:
-
-   If you haven't installed spaCy yet, you can install it along with any necessary requirements:
-
+2. **Download spaCy Base Model**:
    ```bash
-   pip install spacy
    python -m spacy download en_core_web_sm
    ```
 
-2. **Train the NER Model**:
+### Step 2: Annotation and Data Preprocessing
 
-   Use spaCy to train the NER model with your annotated data:
+1. **Annotate Data Using LabelImg**:
+   - Download and install LabelImg: [LabelImg GitHub](https://github.com/tzutalin/labelImg)
+   - Annotate your receipt images by labeling different entities like `DATE`, `TOTAL`, `ITEM`, `PRICE`, etc.
+   - Save the annotations in Pascal VOC format.
 
-   ```python
-   import spacy
-   import random
-   from spacy.training.example import Example
-   from train_data import TRAIN_DATA
+### Step 3: Convert Annotations to spaCy Format
 
-   # Load a blank English model
-   nlp = spacy.blank('en')
+Create `utils.py`:
 
-   # Create and add the NER pipeline
-   if 'ner' not in nlp.pipe_names:
-       ner = nlp.add_pipe('ner', last=True)
-   else:
-       ner = nlp.get_pipe('ner')
+```python
+import os
+import xml.etree.ElementTree as ET
+import json
 
-   # Add labels to the NER pipeline
-   for _, annotations in TRAIN_DATA:
-       for ent in annotations.get('entities'):
-           ner.add_label(ent[2])
+def convert_voc_to_spacy_format(annotations_dir, output_file):
+    train_data = []
 
-   # Disable other pipelines during training
-   other_pipes = [pipe for pipe in nlp.pipe_names if pipe != 'ner']
+    for filename in os.listdir(annotations_dir):
+        if not filename.endswith('.xml'):
+            continue
 
-   # Training the NER model
-   with nlp.disable_pipes(*other_pipes):
-       optimizer = nlp.begin_training()
-       for itn in range(10):  # Adjust number of iterations as needed
-           random.shuffle(TRAIN_DATA)
-           losses = {}
-           for text, annotations in TRAIN_DATA:
-               doc = nlp.make_doc(text)
-               example = Example.from_dict(doc, annotations)
-               nlp.update([example], drop=0.5, sgd=optimizer, losses=losses)
-           print(f"Iteration {itn}: Losses - {losses}")
+        tree = ET.parse(os.path.join(annotations_dir, filename))
+        root = tree.getroot()
 
-   # Save the trained model
-   nlp.to_disk('ner_model')
-   ```
+        text = root.find('filename').text
+        entities = []
+        for obj in root.findall('object'):
+            label = obj.find('name').text
+            bbox = obj.find('bndbox')
+            start_x = int(bbox.find('xmin').text)
+            start_y = int(bbox.find('ymin').text)
+            end_x = int(bbox.find('xmax').text)
+            end_y = int(bbox.find('ymax').text)
+            entities.append(((start_x, start_y), (end_x, end_y), label))
 
-   - Adjust the number of iterations (`itn`) and other parameters based on your specific dataset size and training requirements.
+        train_data.append((text, {"entities": entities}))
 
-   - This script loads the training data from `train_data.py`, initializes a blank spaCy model, adds the NER pipeline, trains the model on the annotated data, and saves the trained model to a directory (`ner_model/`).
+    with open(output_file, 'w') as f:
+        json.dump(train_data, f)
+
+# Example usage
+convert_voc_to_spacy_format('data/annotations', 'data/train_data.json')
+```
+
+### Step 4: Preprocess Images
+
+Create `scripts/preprocess.py`:
+
+```python
+import cv2
+import os
+
+def preprocess_image(image_path):
+    image = cv2.imread(image_path)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
+    return thresh
+
+def preprocess_images(input_dir, output_dir):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for filename in os.listdir(input_dir):
+        if not filename.endswith(('.jpg', '.png')):
+            continue
+        image_path = os.path.join(input_dir, filename)
+        preprocessed_image = preprocess_image(image_path)
+        cv2.imwrite(os.path.join(output_dir, filename), preprocessed_image)
+
+# Example usage
+preprocess_images('data/images', 'data/preprocessed_images')
+```
+
+### Step 5: Perform OCR Using PaddleOCR
+
+Create `scripts/ocr.py`:
+
+```python
+from paddleocr import PaddleOCR
+import os
+import json
+
+def perform_ocr(image_path):
+    ocr = PaddleOCR(use_angle_cls=True, lang='en')
+    result = ocr.ocr(image_path, cls=True)
+    texts = []
+    for line in result[0]:
+        texts.append(line[1][0])
+    return result
+
+def ocr_images(input_dir, output_dir):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for filename in os.listdir(input_dir):
+        if not filename.endswith(('.jpg', '.png')):
+            continue
+        image_path = os.path.join(input_dir, filename)
+        ocr_result = perform_ocr(image_path)
+        with open(os.path.join(output_dir, filename + '.json'), 'w') as f:
+            json.dump(ocr_result, f)
+
+# Example usage
+ocr_images('data/preprocessed_images', 'data/ocr_results')
+```
+
+### Step 6: Train NER Model
+
+Create `scripts/train_ner.py`:
+
+```python
+import spacy
+import random
+import json
+
+def load_train_data(file_path):
+    with open(file_path, 'r') as f:
+        train_data = json.load(f)
+    return train_data
+
+def train_ner_model(train_data, output_dir):
+    nlp = spacy.blank("en")
+    if "ner" not in nlp.pipe_names:
+        ner = nlp.create_pipe("ner")
+        nlp.add_pipe(ner, last=True)
+    else:
+        ner = nlp.get_pipe("ner")
+
+    for _, annotations in train_data:
+        for ent in annotations.get("entities"):
+            ner.add_label(ent[2])
+
+    optimizer = nlp.begin_training()
+    for itn in range(30):
+        print(f"Iteration {itn}")
+        random.shuffle(train_data)
+        losses = {}
+        for text, annotations in train_data:
+            nlp.update([text], [annotations], drop=0.5, losses=losses)
+        print(losses)
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    nlp.to_disk(output_dir)
+
+# Example usage
+train_data = load_train_data('data/train_data.json')
+train_ner_model(train_data, 'models/ner_model')
+```
+
+### Step 7: Parse Receipts Using OCR and NER
+
+Create `scripts/parse_receipt.py`:
+
+```python
+from paddleocr import PaddleOCR
+import spacy
+import os
+import json
+from datetime import datetime
+
+def perform_ocr(image_path):
+    ocr = PaddleOCR(use_angle_cls=True, lang='en')
+    result = ocr.ocr(image_path, cls=True)
+    texts = []
+    for line in result[0]:
+        texts.append(line[1][0])
+    return result, "\n".join(texts)
+
+def parse_receipt(image_path, ner_model_path, output_file):
+    ocr_result, ocr_text = perform_ocr(image_path)
+    nlp = spacy.load(ner_model_path)
+    doc = nlp(ocr_text)
+    
+    parsed_entities = {}
+    items = []
+
+    for ent in doc.ents:
+        if ent.label_ in parsed_entities:
+            parsed_entities[ent.label_].append(ent.text)
+        else:
+            parsed_entities[ent.label_] = [ent.text]
+    
+    for token in doc:
+        if token.ent_type_ == "ITEM":
+            items.append({"description": token.text, "amount": None, "flags": None, "qty": None, "remarks": None, "unitPrice": None})
+    
+    result_json = {
+        "ocr_type": "receipts",
+        "request_id": "P_0-0-0-0-0-0-0-1_kr3awxez_810",
+        "ref_no": "AspDemo_1626256135747_535",
+        "file_name": os.path.basename(image_path),
+        "request_received_on": int(datetime.now().timestamp() * 1000),
+        "success": True,
+        "image_width": None,
+        "image_height": None,
+        "image_rotation": 0.0,
+        "recognition_completed_on": int(datetime.now().timestamp() * 1000),
+        "receipts": [{
+            "merchant_name": parsed_entities.get("merchant_name", [None])[0],
+            "merchant_address": parsed_entities.get("merchant_address", [None])[0],
+            "merchant_phone": parsed_entities.get("merchant_phone", [None])[0],
+            "merchant_website": None,
+            "merchant_tax_reg_no": None,
+            "merchant_company_reg_no": None,
+            "region": None,
+            "mall": None,
+            "country": "US",
+            "receipt_no": parsed_entities.get("receipt_no", [None])[0],
+            "date": parsed_entities.get("date", [None])[0],
+            "time": parsed_entities.get("time", [None])[0],
+            "items": items,
+            "currency": "USD",
+            "total": parsed_entities.get("total", [None])[0],
+            "subtotal": parsed_entities.get("subtotal", [None])[0],
+            "tax": parsed_entities.get("tax", [None])[0],
+            "service_charge": None,
+            "tip": None,
+            "payment_method": parsed_entities.get("payment_method", [None])[0],
+            "payment_details": None,
+            "credit_card_type": None,
+            "credit_card_number": None,
+            "ocr_text": ocr_text,
+            "ocr_confidence": None,
+            "width": None,
+            "height": None,
+            "avg_char_width": None,
+            "avg_line_height": None,
+            "source_locations": {}
+        }]
+    }
+    
+    with open(output_file, 'w') as f:
+        json.dump(result_json, f, indent=4)
+
+# Example usage
+image_path = 'data/preprocessed_images/receipt.jpg'
+ner_model_path = 'models/ner_model'
+output_file = 'data/parsed_receipt.json'
+parse_receipt(image_path, ner_model_path, output_file)
+```
 
 ### Summary
-
-By following these steps, you can annotate receipt text using `labelImg`, convert those annotations into a format suitable for training an NER model, and then train the model using spaCy. This process allows you to create a customized receipt parsing model capable of extracting structured data from new receipts. Adjust the steps and scripts according to your specific requirements and data formats. If you have further questions or need more clarification, feel free to ask!
+This project structure and code snippets provide
