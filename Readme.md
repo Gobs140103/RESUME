@@ -272,6 +272,24 @@ ner_model_path = 'models/ner_model'
 output_file = 'data/parsed_receipt.json'
 parse_receipt(image_path, ner_model_path, output_file)
 ```
+receipt-parser/
+│
+├── data/
+│   ├── images/        # Receipt images for annotation
+│   └── annotations/   # Annotations in JSON format
+│
+├── scripts/
+│   ├── preprocess.py  # Preprocessing images
+│   ├── ocr.py         # Running OCR using PaddleOCR
+│   ├── train_ner.py   # Training NER model using spaCy
+│   ├── parse_receipt.py # Combining OCR and NER results
+│   └── utils.py       # Utility functions
+│
+├── models/
+│   └── ner_model/     # Directory to save the trained NER model
+│
+└── requirements.txt   # Project dependencies
+
 
 ### Summary
 This project structure and code snippets provide
