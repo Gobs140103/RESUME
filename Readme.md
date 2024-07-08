@@ -1,258 +1,146 @@
-To create a receipt parser that outputs the detailed JSON structure you provided, we will follow these steps:
+If your JSON data format for training is structured as `[[ocr_text, {"entities": [[start1, end1, label1], [start2, end2, label2], ...]}], ...]`, where each sublist contains OCR text and corresponding entity annotations, you'll need to modify the script to handle this specific format. Here’s how you can adjust the `train_ner.py` script accordingly:
 
-1. **OCR to extract text and layout information from the receipt image using PaddleOCR.**
-2. **NER model to identify and extract relevant entities from the OCR text.**
-3. **Combine OCR and NER results to structure the output JSON accordingly.**
+### Example Training Data Format
 
-Here’s a step-by-step guide, including the necessary code:
+Assuming your `train_data.json` looks like this:
 
-### Step 1: Set Up the Environment
-
-1. **Install Required Libraries**:
-
-   Create a `requirements.txt` file:
-   ```plaintext
-   paddlepaddle
-   paddleocr
-   spacy
-   numpy
-   pandas
-   opencv-python
-   ```
-   Install the dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Download spaCy Base Model**:
-   ```bash
-   python -m spacy download en_core_web_sm
-   ```
-
-### Step 2: Annotation and Data Preprocessing
-
-1. **Annotate Data Using LabelImg**:
-   - Download and install LabelImg: [LabelImg GitHub](https://github.com/tzutalin/labelImg)
-   - Annotate your receipt images by labeling different entities like `DATE`, `TOTAL`, `ITEM`, `PRICE`, etc.
-   - Save the annotations in Pascal VOC format.
-
-### Step 3: Convert Annotations to spaCy Format
-
-Create `utils.py`:
-
-```python
-import os
-import xml.etree.ElementTree as ET
-import json
-
-def convert_voc_to_spacy_format(annotations_dir, output_file):
-    train_data = []
-
-    for filename in os.listdir(annotations_dir):
-        if not filename.endswith('.xml'):
-            continue
-
-        tree = ET.parse(os.path.join(annotations_dir, filename))
-        root = tree.getroot()
-
-        text = root.find('filename').text
-        entities = []
-        for obj in root.findall('object'):
-            label = obj.find('name').text
-            bbox = obj.find('bndbox')
-            start_x = int(bbox.find('xmin').text)
-            start_y = int(bbox.find('ymin').text)
-            end_x = int(bbox.find('xmax').text)
-            end_y = int(bbox.find('ymax').text)
-            entities.append(((start_x, start_y), (end_x, end_y), label))
-
-        train_data.append((text, {"entities": entities}))
-
-    with open(output_file, 'w') as f:
-        json.dump(train_data, f)
-
-# Example usage
-convert_voc_to_spacy_format('data/annotations', 'data/train_data.json')
+```json
+[
+    [
+        "OCR text from image 1",
+        {
+            "entities": [
+                [49, 129, "MERCHANT_NAME"],
+                [143, 160, "ADDRESS"]
+            ]
+        }
+    ],
+    [
+        "OCR text from image 2",
+        {
+            "entities": [
+                [30, 68, "MERCHANT_NAME"],
+                [72, 95, "ADDRESS"]
+            ]
+        }
+    ]
+]
 ```
 
-### Step 4: Preprocess Images
+### Updated `train_ner.py` Script
 
-Create `scripts/preprocess.py`:
-
-```python
-import cv2
-import os
-
-def preprocess_image(image_path):
-    image = cv2.imread(image_path)
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-    return thresh
-
-def preprocess_images(input_dir, output_dir):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    for filename in os.listdir(input_dir):
-        if not filename.endswith(('.jpg', '.png')):
-            continue
-        image_path = os.path.join(input_dir, filename)
-        preprocessed_image = preprocess_image(image_path)
-        cv2.imwrite(os.path.join(output_dir, filename), preprocessed_image)
-
-# Example usage
-preprocess_images('data/images', 'data/preprocessed_images')
-```
-
-### Step 5: Perform OCR Using PaddleOCR
-
-Create `scripts/ocr.py`:
-
-```python
-from paddleocr import PaddleOCR
-import os
-import json
-
-def perform_ocr(image_path):
-    ocr = PaddleOCR(use_angle_cls=True, lang='en')
-    result = ocr.ocr(image_path, cls=True)
-    texts = []
-    for line in result[0]:
-        texts.append(line[1][0])
-    return result
-
-def ocr_images(input_dir, output_dir):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    for filename in os.listdir(input_dir):
-        if not filename.endswith(('.jpg', '.png')):
-            continue
-        image_path = os.path.join(input_dir, filename)
-        ocr_result = perform_ocr(image_path)
-        with open(os.path.join(output_dir, filename + '.json'), 'w') as f:
-            json.dump(ocr_result, f)
-
-# Example usage
-ocr_images('data/preprocessed_images', 'data/ocr_results')
-```
-
-### Step 6: Train NER Model
-
-Create `scripts/train_ner.py`:
+Here's how you can modify the script to train a spaCy NER model using this format:
 
 ```python
 import spacy
 import random
 import json
+from spacy.training import Example
+from paddleocr import PaddleOCR
 
-def load_train_data(file_path):
-    with open(file_path, 'r') as f:
-        train_data = json.load(f)
-    return train_data
+# Initialize PaddleOCR
+ocr = PaddleOCR(use_angle_cls=True, lang='en')
 
-def train_ner_model(train_data, output_dir):
-    nlp = spacy.blank("en")
-    if "ner" not in nlp.pipe_names:
-        ner = nlp.create_pipe("ner")
-        nlp.add_pipe(ner, last=True)
-    else:
-        ner = nlp.get_pipe("ner")
+def get_text_from_image(image_path):
+    # Run OCR on the image
+    result = ocr.ocr(image_path, cls=True)
+    
+    # Extract text from the OCR result
+    text_lines = []
+    for line in result:
+        for res in line:
+            text_lines.append(res[1][0])  # res[1][0] contains the recognized text
 
-    for _, annotations in train_data:
-        for ent in annotations.get("entities"):
-            ner.add_label(ent[2])
+    # Join all text lines into a single string
+    text = '\n'.join(text_lines)
+    return text
 
-    optimizer = nlp.begin_training()
-    for itn in range(30):
-        print(f"Iteration {itn}")
-        random.shuffle(train_data)
-        losses = {}
-        for text, annotations in train_data:
-            nlp.update([text], [annotations], drop=0.5, losses=losses)
-        print(losses)
+# Load spaCy English model with blank pipeline
+nlp = spacy.blank("en")
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    nlp.to_disk(output_dir)
+# Add NER component to the pipeline using the string name
+ner = nlp.add_pipe("ner")
 
-# Example usage
-train_data = load_train_data('data/train_data.json')
-train_ner_model(train_data, 'models/ner_model')
+# Load your training data from JSON
+with open("train_data.json", "r") as f:
+    train_data = json.load(f)
+
+# Define function to convert data to spaCy format
+def convert_data_to_spacy(data):
+    ner_data = []
+    for entry in data:
+        ocr_text = entry[0]
+        entities = entry[1]['entities']
+        entities_spacy = [(start, end, label) for start, end, label in entities]
+        ner_data.append((ocr_text, {"entities": entities_spacy}))
+    return ner_data
+
+# Convert data to spaCy format
+formatted_data = convert_data_to_spacy(train_data)
+
+# Add labels to the NER component
+for entry in train_data:
+    for ent in entry[1]['entities']:
+        ner.add_label(ent[2])
+
+# Initialize the optimizer
+optimizer = nlp.begin_training()
+
+# Train the NER model
+for itn in range(10):  # Example: Train for 10 iterations
+    random.shuffle(formatted_data)
+    losses = {}
+    
+    for text, annotations in formatted_data:
+        doc = nlp.make_doc(text)
+        example = Example.from_dict(doc, annotations)
+        nlp.update([example], drop=0.5, sgd=optimizer, losses=losses)
+    
+    print(f"Iteration {itn+1}: Losses - {losses}")
+
+# Save the trained model
+nlp.to_disk("trained_ner_model")
+
+# Example usage: Test the trained model
+test_image_path = "path_to_test_receipt_image.jpg"
+test_text = get_text_from_image(test_image_path)
+doc = nlp(test_text)
+print("Entities:", [(ent.text, ent.label_) for ent in doc.ents])
 ```
 
-### Step 7: Parse Receipts Using OCR and NER
+### Explanation
 
-Create `scripts/parse_receipt.py`:
+1. **Extract Text**:
+   - The `get_text_from_image` function processes the image using PaddleOCR and extracts the text. The text lines are concatenated into a single string for NER processing.
 
-```python
-from paddleocr import PaddleOCR
-import spacy
-import os
-import json
-from datetime import datetime
+2. **Training Data Format**:
+   - The `train_data.json` file now contains entries structured with OCR text as the first element and entity annotations under `"entities"` as lists of `[start, end, label]`.
 
-def perform_ocr(image_path):
-    ocr = PaddleOCR(use_angle_cls=True, lang='en')
-    result = ocr.ocr(image_path, cls=True)
-    texts = []
-    for line in result[0]:
-        texts.append(line[1][0])
-    return result, "\n".join(texts)
+3. **Handling Annotations**:
+   - The `convert_data_to_spacy` function converts your JSON data into a format suitable for spaCy training, extracting `start`, `end`, and `label` for each entity within the OCR text.
 
-def parse_receipt(image_path, ner_model_path, output_file):
-    ocr_result, ocr_text = perform_ocr(image_path)
-    nlp = spacy.load(ner_model_path)
-    doc = nlp(ocr_text)
-    
-    parsed_entities = {}
-    items = []
+4. **Training Loop**:
+   - The script iterates over each entry in `formatted_data`, creates spaCy `Example` objects, and updates the NER model with the annotations.
 
-    for ent in doc.ents:
-        if ent.label_ in parsed_entities:
-            parsed_entities[ent.label_].append(ent.text)
-        else:
-            parsed_entities[ent.label_] = [ent.text]
-    
-    for token in doc:
-        if token.ent_type_ == "ITEM":
-            items.append({"description": token.text, "amount": None, "flags": None, "qty": None, "remarks": None, "unitPrice": None})
-    
-    result_json = {
-        "ocr_type": "receipts",
-        "request_id": "P_0-0-0-0-0-0-0-1_kr3awxez_810",
-        "ref_no": "AspDemo_1626256135747_535",
-        "file_name": os.path.basename(image_path),
-        "request_received_on": int(datetime.now().timestamp() * 1000),
-        "success": True,
-        "image_width": None,
-        "image_height": None,
-        "image_rotation": 0.0,
-        "recognition_completed_on": int(datetime.now().timestamp() * 1000),
-        "receipts": [{
-            "merchant_name": parsed_entities.get("merchant_name", [None])[0],
-            "merchant_address": parsed_entities.get("merchant_address", [None])[0],
-            "merchant_phone": parsed_entities.get("merchant_phone", [None])[0],
-            "merchant_website": None,
-            "merchant_tax_reg_no": None,
-            "merchant_company_reg_no": None,
-            "region": None,
-            "mall": None,
-            "country": "US",
-            "receipt_no": parsed_entities.get("receipt_no", [None])[0],
-            "date": parsed_entities.get("date", [None])[0],
-            "time": parsed_entities.get("time", [None])[0],
-            "items": items,
-            "currency": "USD",
-            "total": parsed_entities.get("total", [None])[0],
-            "subtotal": parsed_entities.get("subtotal", [None])[0],
-            "tax": parsed_entities.get("tax", [None])[0],
-            "service_charge": None,
-            "tip": None,
-            "payment_method": parsed_entities.get("payment_method", [None])[0],
-            "payment_details": None,
-            "credit_card_type": None,
-            "credit_card_number": None,
+5. **Saving and Testing**:
+   - After training, the model is saved to disk. The script includes an example of how to test the trained model with a new receipt image.
+
+### Running the Project
+
+1. **Annotate Receipts**:
+   - Annotate a diverse set of receipts to cover different formats using tools like LabelImg.
+
+2. **Convert Annotations**:
+   - Use `utils.py` to convert XML annotations to JSON if needed.
+
+3. **Train the Model**:
+   - Update and run the `train_ner.py` script to train the model with the annotated data.
+
+4. **Evaluate and Refine**:
+   - Test the model with new receipt texts.
+   - Continue refining the model by annotating more data and adjusting training parameters as needed.
+
+This approach ensures that your NER model is trained with correct annotations from your OCR text data, using the specific format where entities are defined by their `start`, `end`, and `label`. Adjust paths and specific details according to your project requirements. If you have any further questions or encounter issues, feel free to ask!
             "ocr_text": ocr_text,
             "ocr_confidence": None,
             "width": None,
