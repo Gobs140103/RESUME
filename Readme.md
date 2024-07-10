@@ -1,140 +1,237 @@
+To ensure that a user cannot interact with the bot unless they are authenticated, you can create a custom action that checks if the user is authenticated before processing their requests. If the user is not authenticated, the bot can prompt the user to log in.
 
-Choosing between spell-checking and fuzzy matching depends on the specific requirements and characteristics of your receipt OCR use case. Here's a comparison to help you decide:
+Here's how to implement this in your Rasa project:
 
-### Spell-Checking
-**Pros:**
-1. **Correction of Common OCR Errors**: Spell-checking can automatically correct common OCR errors, improving overall text quality.
-2. **Broad Application**: Corrects a wide range of spelling errors, not limited to specific patterns or entities.
-3. **Simplicity**: Easy to implement and integrate with existing text processing pipelines.
+### Step 1: Update the Domain
+Update your `domain.yml` to include the intents, slots, and responses for authentication.
 
-**Cons:**
-1. **Context-Awareness**: Spell-checkers may not always understand context, leading to incorrect corrections.
-2. **Domain-Specific Terms**: May struggle with domain-specific terms or uncommon words not in the dictionary.
+```yaml
+slots:
+  userid:
+    type: text
+    influence_conversation: false
 
-### Fuzzy Matching
-**Pros:**
-1. **Tolerance to Minor Errors**: Handles small spelling errors and variations, especially useful for recognizing specific entities.
-2. **Contextual Matching**: Better at recognizing context-specific patterns, such as "tax" or "total" in receipts.
-3. **Customization**: Patterns can be tailored to specific needs, allowing for more precise entity extraction.
+  password:
+    type: text
+    influence_conversation: false
 
-**Cons:**
-1. **Complexity**: More complex to implement and requires careful pattern definition.
-2. **Limited Scope**: Primarily focused on matching specific patterns rather than general text correction.
+  jwt_token:
+    type: text
+    influence_conversation: false
 
-### Recommendations
-- **For General Text Correction**: If you need to correct a wide range of OCR errors across all text, a spell-checker might be more effective.
-- **For Specific Entity Recognition**: If your focus is on accurately extracting specific entities like "tax" or "total" with tolerance for minor errors, fuzzy matching is likely better.
+intents:
+  - greet
+  - ask_question
+  - login
+  - provide_credentials
+  - fallback
 
-### Implementation Using Both Approaches
+entities:
+  - userid
+  - password
 
-Combining both approaches can provide the best results. You can first correct the general OCR errors using spell-checking and then apply fuzzy matching for entity extraction.
+responses:
+  utter_greet:
+    - text: "Hello! Please login to continue."
 
-### Step-by-Step Implementation
+  utter_ask_userid:
+    - text: "Please enter your user ID."
 
-#### Step 1: Install Required Libraries
+  utter_ask_password:
+    - text: "Please enter your password."
+
+  utter_login_success:
+    - text: "Login successful! How can I help you today?"
+
+  utter_login_failed:
+    - text: "Login failed. Please try again."
+
+  utter_unauthorized:
+    - text: "You are not authenticated. Please log in to continue."
+
+  utter_goodbye:
+    - text: "Goodbye!"
+
+actions:
+  - action_validate_credentials
+  - action_set_userid
+  - action_check_authentication
+
+session_config:
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true
+```
+
+### Step 2: Define NLU Data
+Update your `nlu.yml` to recognize the relevant intents and entities.
+
+```yaml
+version: "3.0"
+
+nlu:
+- intent: greet
+  examples: |
+    - hi
+    - hello
+    - hey
+
+- intent: ask_question
+  examples: |
+    - I have a question about my account
+
+- intent: login
+  examples: |
+    - I want to log in
+    - login
+    - log me in
+
+- intent: provide_credentials
+  examples: |
+    - my user ID is [user123](userid)
+    - my password is [mypassword](password)
+    - user ID: [user123](userid), password: [mypassword](password)
+```
+
+### Step 3: Create Custom Actions
+Create custom actions to handle authentication and authorization in `actions.py`.
+
+```python
+import os
+from typing import Any, Text, Dict, List
+
+from rasa_sdk import Action, Tracker
+from rasa_sdk.executor import CollectingDispatcher
+from rasa_sdk.events import SlotSet, FollowupAction
+import jwt
+
+# Define your secret key
+SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your_default_secret_key')
+
+# Dummy user database
+USER_DB = {
+    'user123': 'mypassword'
+}
+
+class ActionValidateCredentials(Action):
+
+    def name(self) -> Text:
+        return "action_validate_credentials"
+
+    async def run(self, dispatcher: CollectingDispatcher,
+                  tracker: Tracker,
+                  domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        userid = tracker.get_slot('userid')
+        password = tracker.get_slot('password')
+
+        if userid in USER_DB and USER_DB[userid] == password:
+            token = jwt.encode({'userid': userid}, SECRET_KEY, algorithm='HS256')
+            dispatcher.utter_message(response="utter_login_success")
+            return [SlotSet("jwt_token", token), FollowupAction("action_set_userid")]
+        else:
+            dispatcher.utter_message(response="utter_login_failed")
+            return [SlotSet("userid", None), SlotSet("password", None), SlotSet("jwt_token", None)]
+
+class ActionSetUserid(Action):
+
+    def name(self) -> Text:
+        return "action_set_userid"
+
+    async def run(self, dispatcher: CollectingDispatcher,
+                  tracker: Tracker,
+                  domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        token = tracker.get_slot('jwt_token')
+        if token:
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+                userid = payload.get('userid')
+                if userid:
+                    return [SlotSet("userid", userid)]
+            except jwt.ExpiredSignatureError:
+                dispatcher.utter_message(text="Token has expired.")
+            except jwt.InvalidTokenError:
+                dispatcher.utter_message(text="Invalid token.")
+        
+        return [SlotSet("userid", None)]
+
+class ActionCheckAuthentication(Action):
+
+    def name(self) -> Text:
+        return "action_check_authentication"
+
+    async def run(self, dispatcher: CollectingDispatcher,
+                  tracker: Tracker,
+                  domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        token = tracker.get_slot('jwt_token')
+        if token:
+            try:
+                jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+                return []
+            except jwt.ExpiredSignatureError:
+                dispatcher.utter_message(text="Token has expired. Please log in again.")
+            except jwt.InvalidTokenError:
+                dispatcher.utter_message(text="Invalid token. Please log in again.")
+        
+        dispatcher.utter_message(response="utter_unauthorized")
+        return [FollowupAction("action_ask_userid")]
+```
+
+### Step 4: Define Stories
+Update your `stories.yml` to include the login flow and check authentication.
+
+```yaml
+version: "3.0"
+
+stories:
+- story: user login
+  steps:
+  - intent: greet
+  - action: utter_ask_userid
+  - intent: provide_credentials
+    entities:
+      - userid: user123
+  - action: utter_ask_password
+  - intent: provide_credentials
+    entities:
+      - password: mypassword
+  - action: action_validate_credentials
+  - slot_was_set:
+    - jwt_token: "some_token"
+
+- story: ask question
+  steps:
+  - intent: ask_question
+  - action: action_check_authentication
+  - action: action_ask_question
+```
+
+### Step 5: Configure Endpoints
+Ensure your `endpoints.yml` file is configured to run custom actions.
+
+```yaml
+action_endpoint:
+  url: "http://localhost:5055/webhook"
+```
+
+### Step 6: Run the Rasa Server
+Run the Rasa server and action server.
 
 ```sh
-pip install paddlepaddle paddleocr spacy fuzzywuzzy spellchecker
-python -m spacy download en_core_web_sm
+rasa run actions
+rasa run
 ```
 
-#### Step 2: Import Libraries and Initialize Models
+### Interaction Flow
 
-```python
-import paddleocr
-import spacy
-from fuzzywuzzy import fuzz, process
-from spellchecker import SpellChecker
-from spacy.matcher import Matcher
+1. User: "Hi"
+2. Bot: "Hello! Please login to continue."
+3. User: "My user ID is user123"
+4. Bot: "Please enter your password."
+5. User: "My password is mypassword"
+6. Bot: "Login successful! How can I help you today?"
+7. User: "I have a question about my account"
+8. Bot: (Processes the question if authenticated, otherwise prompts to log in)
 
-# Initialize PaddleOCR
-ocr = paddleocr.OCR()
-
-# Initialize spaCy model
-nlp = spacy.load('en_core_web_sm')
-
-# Initialize spell checker
-spell = SpellChecker()
-```
-
-#### Step 3: Extract Text from Receipt Image
-
-```python
-def extract_text(image_path):
-    result = ocr.ocr(image_path)
-    lines = [line[1][0] for line in result[0]]
-    text = "\n".join(lines)
-    return text
-```
-
-#### Step 4: Correct Spelling Mistakes
-
-```python
-def correct_spelling(text):
-    corrected_text = []
-    for word in text.split():
-        corrected_word = spell.correction(word)
-        corrected_text.append(corrected_word)
-    return " ".join(corrected_text)
-```
-
-#### Step 5: Define Patterns for Entity Recognition with Fuzzy Matching
-
-```python
-def create_matcher(nlp):
-    matcher = Matcher(nlp.vocab)
-    
-    # Define patterns with fuzzy matching
-    patterns = [
-        {"label": "TAX", "pattern": [{"LOWER": {"FUZZY": "tax"}}, {"IS_DIGIT": True}]},
-        {"label": "TOTAL", "pattern": [{"LOWER": {"FUZZY": "total"}}, {"IS_DIGIT": True}]},
-        {"label": "MERCHANT_NAME", "pattern": [{"POS": "PROPN"}, {"POS": "PROPN"}]},
-        # Add more patterns as needed
-    ]
-    
-    for pattern in patterns:
-        matcher.add(pattern["label"], [pattern["pattern"]])
-    
-    return matcher
-```
-
-#### Step 6: Extract Entities Using spaCy Matcher
-
-```python
-def extract_entities(text, matcher):
-    doc = nlp(text)
-    matches = matcher(doc)
-    entities = {"TAX": None, "TOTAL": None, "MERCHANT_NAME": None}
-    
-    for match_id, start, end in matches:
-        match_label = nlp.vocab.strings[match_id]
-        span = doc[start:end]
-        entities[match_label] = span.text
-    
-    return entities
-```
-
-#### Step 7: Combine All Steps
-
-```python
-def parse_receipt(image_path):
-    text = extract_text(image_path)
-    corrected_text = correct_spelling(text)
-    matcher = create_matcher(nlp)
-    entities = extract_entities(corrected_text, matcher)
-    return entities
-
-# Example usage
-image_path = "path/to/receipt.jpg"
-entities = parse_receipt(image_path)
-print(entities)
-```
-
-### Explanation
-1. **PaddleOCR**: Extracts text from the receipt image.
-2. **Spell Checker**: Corrects general OCR errors.
-3. **Fuzzy Matching**: Customizes spaCy's matcher to include fuzzy matching for handling minor spelling errors.
-4. **spaCy Matcher**: Uses patterns to identify entities like tax, total amount, and merchant name.
-5. **Combining Steps**: The final function integrates text extraction, correction, and entity recognition to parse the receipt.
-
-By combining both spell-checking and fuzzy matching, you ensure better accuracy and robustness in extracting key information from receipts.
+In this implementation, the bot will prompt the user to log in if they are not authenticated. Any interaction that requires authentication will check for the JWT token and validate it. If the token is invalid or expired, the bot will prompt the user to log in again.
