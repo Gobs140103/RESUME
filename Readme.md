@@ -1,129 +1,261 @@
-To handle the custom query functionality in your Rasa bot, you need to update your Rasa project to include an intent for custom queries, a custom action to process the selected attributes, and update the domain file to support these changes. Below are the steps to update your Rasa bot:
+Understood! We'll create a simple form in HTML with checkboxes that sends the selected attributes to the Rasa bot via a custom action. This custom action will process the selected attributes and respond accordingly.
 
-### 1. Define the Intent in `nlu.yml`
-Add an intent for custom queries and the possible user message.
+### Frontend: HTML and JavaScript
 
-```yaml
-version: "3.1"
-nlu:
-  - intent: custom_query
-    examples: |
-      - custom query
-      - I want to make a custom query
-      - Show me the custom query form
+First, let's update your `index.html` and `style.css` to include the form.
+
+**index.html:**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Widget</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&family=Raleway:500&family=Roboto:wght@300&family=Lato&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha256-eZrrJcwDc/3uDhsdt61sL2oOBY362qM3lon1gyExkL0=" crossorigin="anonymous">
+    <link rel="stylesheet" href="static/css/materialize.min.css">
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="modal1" class="modal">
+            <canvas id="modal-chart"></canvas>
+        </div>
+        <div class="widget">
+            <div class="chat_header">
+                <span class="chat_header_title">Sara</span>
+                <span class="dropdown-trigger" href="#" data-target="dropdown1">
+                    <i class="material-icons">more_vert</i>
+                </span>
+                <ul id="dropdown1" class="dropdown-content">
+                    <li><a href="#" id="clear">Clear</a></li>
+                    <li><a href="#" id="restart">Restart</a></li>
+                    <li><a href="#" id="close">Close</a></li>
+                </ul>
+            </div>
+            <div class="chats" id="chats">
+                <div class="clearfix"></div>
+            </div>
+            <div class="keypad">
+                <textarea id="userInput" placeholder="Type a message..." class="usrInput"></textarea>
+                <div id="sendButton" role="button" aria-label="Send message">
+                    <i class="fa fa-paper-plane" aria-hidden="true"></i>
+                </div>
+            </div>
+        </div>
+        <div class="profile_div" id="profile_div">
+            <img class="imgProfile" src="static/img/botAvatar.png" alt="Bot Avatar">
+        </div>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="static/js/lib/materialize.min.js"></script>
+    <script src="static/js/lib/uuid.min.js"></script>
+    <script src="static/js/script.js"></script>
+    <script src="static/js/lib/chart.min.js"></script>
+    <script src="static/js/lib/showdown.min.js"></script>
+    <script src="static/js/custom-query.js"></script>
+</body>
+</html>
 ```
 
-### 2. Define the Slots and Entities in `domain.yml`
-Update your `domain.yml` to include slots and entities that will capture the selected attributes.
+**style.css:**
+```css
+.checkbox-options {
+  padding: 10px;
+  background: #ffffff;
+  box-shadow: 2px 5px 5px 1px #dbdade;
+  border-radius: 10px;
+  margin: 10px;
+}
 
-```yaml
-version: "3.1"
-intents:
-  - custom_query
+.checkbox-options h3 {
+  margin-bottom: 10px;
+  color: #2c3e50;
+  font-size: 18px;
+}
 
-entities:
-  - attribute
+.checkbox-options label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  color: #2c3e50;
+}
 
-slots:
-  attribute:
-    type: list
-    influence_conversation: false
+.checkbox-options input[type="checkbox"] {
+  margin-right: 10px;
+}
 
-responses:
-  utter_ask_custom_query:
-    - text: "Please select the attributes you want to query."
+.checkbox-options button {
+  background: #2c3e50;
+  color: #ffffff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
 
-actions:
-  - action_process_custom_query
+.checkbox-options button:hover {
+  background: #1a252f;
+}
 ```
 
-### 3. Add a Form for Custom Queries in `domain.yml`
-Define a form to handle the user input for custom queries.
+**custom-query.js:**
+```javascript
+document.addEventListener('DOMContentLoaded', function () {
+    const chatContainer = document.getElementById("chats");
+    const sendButton = document.getElementById("sendButton");
+    const userInput = document.getElementById("userInput");
 
-```yaml
-forms:
-  custom_query_form:
-    required_slots:
-      attribute:
-        - type: from_entity
-          entity: attribute
-          intent: custom_query
-          not_intent: deny
+    sendButton.addEventListener("click", function () {
+        const message = userInput.value;
+        userInput.value = '';
+        if (message.toLowerCase() === "custom query") {
+            displayCustomQueryOptions();
+        } else {
+            sendMessage(message);
+        }
+    });
+
+    function displayCustomQueryOptions() {
+        const optionsHTML = `
+            <div class="checkbox-options">
+                <h3>Select Attributes</h3>
+                <label><input type="checkbox" value="Attribute1"> Attribute1</label>
+                <label><input type="checkbox" value="Attribute2"> Attribute2</label>
+                <label><input type="checkbox" value="Attribute3"> Attribute3</label>
+                <button id="submitCustomQuery">Submit</button>
+            </div>
+        `;
+        chatContainer.innerHTML += optionsHTML;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        document.getElementById("submitCustomQuery").addEventListener("click", submitCustomQuery);
+    }
+
+    function submitCustomQuery() {
+        const checkboxes = document.querySelectorAll('.checkbox-options input[type="checkbox"]');
+        const selectedAttributes = [];
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                selectedAttributes.push(checkbox.value);
+            }
+        });
+
+        const message = selectedAttributes.length ? `Selected attributes: ${selectedAttributes.join(', ')}` : 'No attributes selected.';
+        sendMessage(message);
+    }
+
+    function sendMessage(message) {
+        if (message.trim() === "") {
+            return;
+        }
+
+        // Display user message
+        chatContainer.innerHTML += `<div class="userMsg">${message}</div>`;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        // Send message to Rasa bot
+        $.ajax({
+            url: "http://localhost:5005/webhooks/rest/webhook",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                sender: "user",
+                message: message
+            }),
+            success: function (botResponse) {
+                displayBotResponse(botResponse);
+            },
+            error: function () {
+                chatContainer.innerHTML += `<div class="botMsg">Sorry, I am having trouble understanding you right now.</div>`;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    }
+
+    function displayBotResponse(response) {
+        if (response.length < 1) {
+            return;
+        }
+
+        response.forEach(function (res) {
+            if (res.text) {
+                chatContainer.innerHTML += `<div class="botMsg">${res.text}</div>`;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    }
+});
 ```
 
-### 4. Create the Custom Action in `actions.py`
-Add a custom action to process the selected attributes and respond accordingly.
+### Backend: Rasa Custom Action
 
+Create a custom action in Rasa to handle the incoming message with selected attributes.
+
+**actions.py:**
 ```python
 from typing import Any, Text, Dict, List
 from rasa_sdk import Action, Tracker
 from rasa_sdk.executor import CollectingDispatcher
-from rasa_sdk.forms import FormValidationAction
 
-class ActionProcessCustomQuery(Action):
+class ActionHandleCustomQuery(Action):
 
     def name(self) -> Text:
-        return "action_process_custom_query"
+        return "action_handle_custom_query"
 
-    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-        attributes = tracker.get_slot("attribute")
-        if not attributes:
-            dispatcher.utter_message(text="No attributes selected.")
+    def run(self, dispatcher: CollectingDispatcher,
+            tracker: Tracker,
+            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+
+        # Extract selected attributes from the latest user message
+        latest_message = tracker.latest_message['text']
+        selected_attributes = latest_message.replace("Selected attributes: ", "").split(", ")
+
+        # Example response based on selected attributes
+        if selected_attributes:
+            response = f"You have selected the following attributes: {', '.join(selected_attributes)}"
         else:
-            query_message = f"Custom query for: {', '.join(attributes)}"
-            dispatcher.utter_message(text=query_message)
-        
+            response = "You did not select any attributes."
+
+        dispatcher.utter_message(text=response)
+
         return []
 ```
 
-### 5. Update `stories.yml`
-Add a story to handle the flow of custom queries.
-
+**domain.yml:**
 ```yaml
-version: "3.1"
-stories:
-  - story: custom query path
+intents:
+  - custom_query
+
+actions:
+  - action_handle_custom_query
+
+responses:
+  utter_custom_query:
+    - text: "Let's start a custom query. Please select the attributes you're interested in."
+
+rules:
+  - rule: Handle custom query
     steps:
-    - intent: custom_query
-    - action: action_process_custom_query
+      - intent: custom_query
+      - action: action_handle_custom_query
 ```
 
-### 6. Update `endpoints.yml`
-Ensure that the action server is correctly defined in `endpoints.yml`.
-
+**nlu.yml:**
 ```yaml
-action_endpoint:
-  url: "http://localhost:5055/webhook"
+version: "2.0"
+nlu:
+- intent: custom_query
+  examples: |
+    - custom query
 ```
 
-### 7. Run the Rasa Action Server
-Ensure your custom actions are running by starting the action server:
+### How it Works
 
-```bash
-rasa run actions
-```
-
-### 8. Train the Rasa Model
-Train your Rasa model to incorporate the new changes.
-
-```bash
-rasa train
-```
-
-### 9. Run the Rasa Bot
-Start your Rasa bot server:
-
-```bash
-rasa run
-```
-
-### Testing the Bot
-With these updates, your bot should now handle the custom query functionality, displaying the custom query form when the user types "custom query," processing the selected attributes, and responding appropriately.
-
-### Handling Frontend Integration
-Ensure your frontend integration correctly sends the selected attributes to the bot and displays the response:
-
-- The JavaScript function `submitCustomQuery` already handles form submission.
-- Ensure the bot processes the message and returns the appropriate response.
-
-By following these steps, your Rasa bot should now support a custom query feature triggered by user input and handle the processing of selected attributes.
+1. When the user types "custom query," the chatbot will display a set of checkboxes.
+2. The user selects the desired attributes and submits them.
+3. The JavaScript sends the selected attributes as a message to the Rasa backend.
+4. The custom action `action_handle_custom_query` processes the message and responds based on the selected attributes.
