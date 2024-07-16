@@ -1,10 +1,37 @@
-To implement the custom query form within the provided chatbot frontend using HTML, CSS, and JavaScript, we'll need to integrate a form with checkboxes into the existing structure. Here’s how you can do it:
+.hidden {
+  display: none;
+}
 
-### 1. Modify `index.html`
+#customQueryForm {
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  margin: 20px 0;
+}
 
-Add the form with checkboxes for the attributes, and include a submit button within the chatbot widget.
+#customQueryForm label {
+  display: block;
+  margin-bottom: 10px;
+}
 
-```html
+#customQueryForm button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: #007BFF;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,7 +44,7 @@ Add the form with checkboxes for the attributes, and include a submit button wit
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha256-eZrrJcwDc/3uDhsdt61sL2oOBY362qM3lon1gyExkL0=" crossorigin="anonymous">
     <!-- Materialize CSS -->
-    <link rel="stylesheet" href="static/css/materialize.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <!-- Main CSS -->
     <link rel="stylesheet" href="static/css/style.css">
 </head>
@@ -57,16 +84,20 @@ Add the form with checkboxes for the attributes, and include a submit button wit
         <!-- Custom Query Form -->
         <div id="customQueryForm" class="hidden">
             <form id="attributeForm">
-                <label>
-                    Attribute 1:
-                    <input type="checkbox" name="attribute_1">
-                </label>
-                <label>
-                    Attribute 2:
-                    <input type="checkbox" name="attribute_2">
-                </label>
+                <p>
+                    <label>
+                        <input type="checkbox" name="attribute_1" />
+                        <span>Attribute 1</span>
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <input type="checkbox" name="attribute_2" />
+                        <span>Attribute 2</span>
+                    </label>
+                </p>
                 <!-- Add more attributes as needed -->
-                <button type="button" onclick="submitForm()">Submit</button>
+                <button type="button" onclick="submitForm()" class="btn">Submit</button>
             </form>
         </div>
         <!-- Bot profile -->
@@ -76,115 +107,118 @@ Add the form with checkboxes for the attributes, and include a submit button wit
     </div>
     <!-- Scripts -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script src="static/js/lib/materialize.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="static/js/script.js"></script>
     <script src="static/js/lib/chart.min.js"></script>
     <script src="static/js/lib/showdown.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            M.AutoInit();
+        });
+    </script>
 </body>
 </html>
-```
 
-### 2. Add Styles in `style.css`
+document.addEventListener("DOMContentLoaded", function() {
+ 
+  const elemsTap = document.querySelector(".tap-target");
+  if (elemsTap) {
+    const instancesTap = M.TapTarget.init(elemsTap, {});
+    instancesTap.open();
+    setTimeout(function() {
+      instancesTap.close();
+    }, 4000);
+  }
+  
+  $("div").removeClass("tap-target-origin");
+  $(".dropdown-trigger").dropdown();
+  $(".modal").modal();
+});
 
-```css
-.hidden {
-    display: none;
+function include(file) {
+  const script = document.createElement('script');
+  script.src = file;
+  script.type = 'text/javascript';
+  script.defer = true;
+  document.getElementsByTagName('head').item(0).appendChild(script);
 }
 
-#customQueryForm {
-    padding: 20px;
-    background-color: #f9f9f9;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    margin: 20px 0;
-}
+include('./static/js/components/index.js');
 
-#customQueryForm label {
-    display: block;
-    margin-bottom: 10px;
-}
+window.addEventListener('load', function() {
 
-#customQueryForm button {
-    margin-top: 20px;
-    padding: 10px 20px;
-    background-color: #007BFF;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-```
+  $(document).ready(function() {
+    $("div").removeClass("tap-target-origin");
+    $(".dropdown-trigger").dropdown();
+    $(".modal").modal();
+  });
 
-### 3. Update JavaScript in `script.js`
+  $("#profile_div").click(function() {
+    $(".profile_div").toggle();
+    $(".widget").toggle();
+  });
 
-Add the necessary JavaScript to handle showing the form, submitting it, and sending the data to the Rasa bot.
+  $("#clear").click(function() {
+    $(".chats").fadeOut("normal", function() {
+      $(".chats").html("");
+      $(".chats").fadeIn();
+    });
+  });
 
-```js
-$(document).ready(function() {
-    $('.modal').modal();
+  $("#close").click(function() {
+    $(".profile_div").toggle();
+    $(".widget").toggle();
+    scrollToBottomOfResults();
+  });
+  $('#customQueryButton').click(function() {
+    $('#customQueryForm').toggleClass('hidden');
+});
 
-    // Open custom query form
-    $('#customQueryButton').click(function() {
-        $('#customQueryForm').toggleClass('hidden');
+// Submit custom query form
+async function submitForm() {
+    const form = document.getElementById('attributeForm');
+    const formData = new FormData(form);
+    const attributes = {};
+
+    formData.forEach((value, key) => {
+        attributes[key] = value === 'on';
     });
 
-    // Submit custom query form
-    async function submitForm() {
-        const form = document.getElementById('attributeForm');
-        const formData = new FormData(form);
-        const attributes = {};
+    const response = await fetch('http://localhost:5005/webhooks/rest/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sender: 'user',
+            message: JSON.stringify(attributes)
+        }),
+    });
 
-        formData.forEach((value, key) => {
-            attributes[key] = value === 'on';
-        });
+    const data = await response.json();
+    console.log(data);
+    setBotResponse(data);
 
-        const response = await fetch('http://localhost:5005/webhooks/rest/webhook', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sender: 'user',
-                message: JSON.stringify(attributes)
-            }),
-        });
+    // Hide the form after submission
+    $('#customQueryForm').addClass('hidden');
+}
 
-        const data = await response.json();
-        console.log(data);
-        setBotResponse(data);
-
-        // Hide the form after submission
-        $('#customQueryForm').addClass('hidden');
-    }
-
-    // Function to send user message to Rasa server
-    function sendCustomQuery(query) {
-        $.ajax({
-            url: 'http://localhost:5005/webhooks/rest/webhook',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ message: query, sender: sender_id }),
-            success: function(botResponse, status) {
-                console.log('Response from Rasa:', botResponse, 'Status:', status);
-                setBotResponse(botResponse);
-            },
-            error: function(xhr, textStatus) {
-                console.log('Error from bot end:', textStatus);
-                setBotResponse([]);
-            }
-        });
-    }
-
-    // Function to set user response in chat window
-    function setUserResponse(message) {
-        // Your implementation here
-    }
-
-    // Function to set bot response in chat window
-    function setBotResponse(response) {
-        // Your implementation here
-    }
-
-    // Other existing functions...
+// Function to send user message to Rasa server
+function sendCustomQuery(query) {
+    $.ajax({
+        url: 'http://localhost:5005/webhooks/rest/webhook',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ message: query, sender: sender_id }),
+        success: function(botResponse, status) {
+            console.log('Response from Rasa:', botResponse, 'Status:', status);
+            setBotResponse(botResponse);
+        },
+        error: function(xhr, textStatus) {
+            console.log('Error from bot end:', textStatus);
+            setBotResponse([]);
+        }
+    });
+}
 });
-```
 
-This implementation adds a custom query form within your chatbot frontend, allowing users to select attributes and send them to your Rasa bot. The bot will process the attributes and return a response, which will be displayed in the chat window.
+
+
