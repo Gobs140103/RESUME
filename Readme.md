@@ -1,237 +1,129 @@
-To ensure that a user cannot interact with the bot unless they are authenticated, you can create a custom action that checks if the user is authenticated before processing their requests. If the user is not authenticated, the bot can prompt the user to log in.
+To handle the custom query functionality in your Rasa bot, you need to update your Rasa project to include an intent for custom queries, a custom action to process the selected attributes, and update the domain file to support these changes. Below are the steps to update your Rasa bot:
 
-Here's how to implement this in your Rasa project:
-
-### Step 1: Update the Domain
-Update your `domain.yml` to include the intents, slots, and responses for authentication.
+### 1. Define the Intent in `nlu.yml`
+Add an intent for custom queries and the possible user message.
 
 ```yaml
-slots:
-  userid:
-    type: text
-    influence_conversation: false
+version: "3.1"
+nlu:
+  - intent: custom_query
+    examples: |
+      - custom query
+      - I want to make a custom query
+      - Show me the custom query form
+```
 
-  password:
-    type: text
-    influence_conversation: false
+### 2. Define the Slots and Entities in `domain.yml`
+Update your `domain.yml` to include slots and entities that will capture the selected attributes.
 
-  jwt_token:
-    type: text
-    influence_conversation: false
-
+```yaml
+version: "3.1"
 intents:
-  - greet
-  - ask_question
-  - login
-  - provide_credentials
-  - fallback
+  - custom_query
 
 entities:
-  - userid
-  - password
+  - attribute
+
+slots:
+  attribute:
+    type: list
+    influence_conversation: false
 
 responses:
-  utter_greet:
-    - text: "Hello! Please login to continue."
-
-  utter_ask_userid:
-    - text: "Please enter your user ID."
-
-  utter_ask_password:
-    - text: "Please enter your password."
-
-  utter_login_success:
-    - text: "Login successful! How can I help you today?"
-
-  utter_login_failed:
-    - text: "Login failed. Please try again."
-
-  utter_unauthorized:
-    - text: "You are not authenticated. Please log in to continue."
-
-  utter_goodbye:
-    - text: "Goodbye!"
+  utter_ask_custom_query:
+    - text: "Please select the attributes you want to query."
 
 actions:
-  - action_validate_credentials
-  - action_set_userid
-  - action_check_authentication
-
-session_config:
-  session_expiration_time: 60
-  carry_over_slots_to_new_session: true
+  - action_process_custom_query
 ```
 
-### Step 2: Define NLU Data
-Update your `nlu.yml` to recognize the relevant intents and entities.
+### 3. Add a Form for Custom Queries in `domain.yml`
+Define a form to handle the user input for custom queries.
 
 ```yaml
-version: "3.0"
-
-nlu:
-- intent: greet
-  examples: |
-    - hi
-    - hello
-    - hey
-
-- intent: ask_question
-  examples: |
-    - I have a question about my account
-
-- intent: login
-  examples: |
-    - I want to log in
-    - login
-    - log me in
-
-- intent: provide_credentials
-  examples: |
-    - my user ID is [user123](userid)
-    - my password is [mypassword](password)
-    - user ID: [user123](userid), password: [mypassword](password)
+forms:
+  custom_query_form:
+    required_slots:
+      attribute:
+        - type: from_entity
+          entity: attribute
+          intent: custom_query
+          not_intent: deny
 ```
 
-### Step 3: Create Custom Actions
-Create custom actions to handle authentication and authorization in `actions.py`.
+### 4. Create the Custom Action in `actions.py`
+Add a custom action to process the selected attributes and respond accordingly.
 
 ```python
-import os
 from typing import Any, Text, Dict, List
-
 from rasa_sdk import Action, Tracker
 from rasa_sdk.executor import CollectingDispatcher
-from rasa_sdk.events import SlotSet, FollowupAction
-import jwt
+from rasa_sdk.forms import FormValidationAction
 
-# Define your secret key
-SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your_default_secret_key')
-
-# Dummy user database
-USER_DB = {
-    'user123': 'mypassword'
-}
-
-class ActionValidateCredentials(Action):
+class ActionProcessCustomQuery(Action):
 
     def name(self) -> Text:
-        return "action_validate_credentials"
+        return "action_process_custom_query"
 
-    async def run(self, dispatcher: CollectingDispatcher,
-                  tracker: Tracker,
-                  domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-
-        userid = tracker.get_slot('userid')
-        password = tracker.get_slot('password')
-
-        if userid in USER_DB and USER_DB[userid] == password:
-            token = jwt.encode({'userid': userid}, SECRET_KEY, algorithm='HS256')
-            dispatcher.utter_message(response="utter_login_success")
-            return [SlotSet("jwt_token", token), FollowupAction("action_set_userid")]
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+        attributes = tracker.get_slot("attribute")
+        if not attributes:
+            dispatcher.utter_message(text="No attributes selected.")
         else:
-            dispatcher.utter_message(response="utter_login_failed")
-            return [SlotSet("userid", None), SlotSet("password", None), SlotSet("jwt_token", None)]
-
-class ActionSetUserid(Action):
-
-    def name(self) -> Text:
-        return "action_set_userid"
-
-    async def run(self, dispatcher: CollectingDispatcher,
-                  tracker: Tracker,
-                  domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-
-        token = tracker.get_slot('jwt_token')
-        if token:
-            try:
-                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-                userid = payload.get('userid')
-                if userid:
-                    return [SlotSet("userid", userid)]
-            except jwt.ExpiredSignatureError:
-                dispatcher.utter_message(text="Token has expired.")
-            except jwt.InvalidTokenError:
-                dispatcher.utter_message(text="Invalid token.")
+            query_message = f"Custom query for: {', '.join(attributes)}"
+            dispatcher.utter_message(text=query_message)
         
-        return [SlotSet("userid", None)]
-
-class ActionCheckAuthentication(Action):
-
-    def name(self) -> Text:
-        return "action_check_authentication"
-
-    async def run(self, dispatcher: CollectingDispatcher,
-                  tracker: Tracker,
-                  domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-
-        token = tracker.get_slot('jwt_token')
-        if token:
-            try:
-                jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-                return []
-            except jwt.ExpiredSignatureError:
-                dispatcher.utter_message(text="Token has expired. Please log in again.")
-            except jwt.InvalidTokenError:
-                dispatcher.utter_message(text="Invalid token. Please log in again.")
-        
-        dispatcher.utter_message(response="utter_unauthorized")
-        return [FollowupAction("action_ask_userid")]
+        return []
 ```
 
-### Step 4: Define Stories
-Update your `stories.yml` to include the login flow and check authentication.
+### 5. Update `stories.yml`
+Add a story to handle the flow of custom queries.
 
 ```yaml
-version: "3.0"
-
+version: "3.1"
 stories:
-- story: user login
-  steps:
-  - intent: greet
-  - action: utter_ask_userid
-  - intent: provide_credentials
-    entities:
-      - userid: user123
-  - action: utter_ask_password
-  - intent: provide_credentials
-    entities:
-      - password: mypassword
-  - action: action_validate_credentials
-  - slot_was_set:
-    - jwt_token: "some_token"
-
-- story: ask question
-  steps:
-  - intent: ask_question
-  - action: action_check_authentication
-  - action: action_ask_question
+  - story: custom query path
+    steps:
+    - intent: custom_query
+    - action: action_process_custom_query
 ```
 
-### Step 5: Configure Endpoints
-Ensure your `endpoints.yml` file is configured to run custom actions.
+### 6. Update `endpoints.yml`
+Ensure that the action server is correctly defined in `endpoints.yml`.
 
 ```yaml
 action_endpoint:
   url: "http://localhost:5055/webhook"
 ```
 
-### Step 6: Run the Rasa Server
-Run the Rasa server and action server.
+### 7. Run the Rasa Action Server
+Ensure your custom actions are running by starting the action server:
 
-```sh
+```bash
 rasa run actions
+```
+
+### 8. Train the Rasa Model
+Train your Rasa model to incorporate the new changes.
+
+```bash
+rasa train
+```
+
+### 9. Run the Rasa Bot
+Start your Rasa bot server:
+
+```bash
 rasa run
 ```
 
-### Interaction Flow
+### Testing the Bot
+With these updates, your bot should now handle the custom query functionality, displaying the custom query form when the user types "custom query," processing the selected attributes, and responding appropriately.
 
-1. User: "Hi"
-2. Bot: "Hello! Please login to continue."
-3. User: "My user ID is user123"
-4. Bot: "Please enter your password."
-5. User: "My password is mypassword"
-6. Bot: "Login successful! How can I help you today?"
-7. User: "I have a question about my account"
-8. Bot: (Processes the question if authenticated, otherwise prompts to log in)
+### Handling Frontend Integration
+Ensure your frontend integration correctly sends the selected attributes to the bot and displays the response:
 
-In this implementation, the bot will prompt the user to log in if they are not authenticated. Any interaction that requires authentication will check for the JWT token and validate it. If the token is invalid or expired, the bot will prompt the user to log in again.
+- The JavaScript function `submitCustomQuery` already handles form submission.
+- Ensure the bot processes the message and returns the appropriate response.
+
+By following these steps, your Rasa bot should now support a custom query feature triggered by user input and handle the processing of selected attributes.
