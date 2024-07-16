@@ -1,263 +1,190 @@
-Creating a checklist of buttons in Rasa, where users can select multiple options, involves capturing each button click as an individual event and updating the slot values accordingly. Here's how you can achieve this:
+To implement the custom query form within the provided chatbot frontend using HTML, CSS, and JavaScript, we'll need to integrate a form with checkboxes into the existing structure. Here’s how you can do it:
 
-### 1. Define the Slots and Custom Action in your domain.yml
+### 1. Modify `index.html`
 
-Define a list slot to keep track of the selected options:
+Add the form with checkboxes for the attributes, and include a submit button within the chatbot widget.
 
-```yaml
-slots:
-  selected_options:
-    type: list
-    initial_value: []
-
-actions:
-- action_add_option
-- action_show_selected_options
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Widget</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&family=Raleway:500&family=Roboto:wght@300&family=Lato&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha256-eZrrJcwDc/3uDhsdt61sL2oOBY362qM3lon1gyExkL0=" crossorigin="anonymous">
+    <!-- Materialize CSS -->
+    <link rel="stylesheet" href="static/css/materialize.min.css">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Modal for rendering charts -->
+        <div id="modal1" class="modal">
+            <canvas id="modal-chart"></canvas>
+        </div>
+        <!-- Chatbot widget -->
+        <div class="widget">
+            <div class="chat_header">
+                <span class="chat_header_title">Sara</span>
+                <span class="dropdown-trigger" href="#" data-target="dropdown1">
+                    <i class="material-icons">more_vert</i>
+                </span>
+                <!-- Dropdown menu -->
+                <ul id="dropdown1" class="dropdown-content">
+                    <li><a href="#" id="clear">Clear</a></li>
+                    <li><a href="#" id="restart">Restart</a></li>
+                    <li><a href="#" id="close">Close</a></li>
+                </ul>
+            </div>
+            <div class="chats" id="chats">
+                <div class="clearfix"></div>
+            </div>
+            <div class="keypad">
+                <textarea id="userInput" placeholder="Type a message..." class="usrInput"></textarea>
+                <div id="sendButton" role="button" aria-label="Send message">
+                    <i class="fa fa-paper-plane" aria-hidden="true"></i>
+                </div>
+                <div id="customQueryButton" role="button" aria-label="Custom Query">
+                    <i class="fa fa-search" aria-hidden="true"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Custom Query Form -->
+        <div id="customQueryForm" class="hidden">
+            <form id="attributeForm">
+                <label>
+                    Attribute 1:
+                    <input type="checkbox" name="attribute_1">
+                </label>
+                <label>
+                    Attribute 2:
+                    <input type="checkbox" name="attribute_2">
+                </label>
+                <!-- Add more attributes as needed -->
+                <button type="button" onclick="submitForm()">Submit</button>
+            </form>
+        </div>
+        <!-- Bot profile -->
+        <div class="profile_div" id="profile_div">
+            <img class="imgProfile" src="static/img/botAvatar.png" alt="Bot Avatar">
+        </div>
+    </div>
+    <!-- Scripts -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="static/js/lib/materialize.min.js"></script>
+    <script src="static/js/script.js"></script>
+    <script src="static/js/lib/chart.min.js"></script>
+    <script src="static/js/lib/showdown.min.js"></script>
+</body>
+</html>
 ```
 
-### 2. Implement the Custom Actions in your actions.py
+### 2. Add Styles in `style.css`
 
-Implement a custom action to add an option to the list and another action to show the selected options:
+```css
+.hidden {
+    display: none;
+}
 
-```python
-from rasa_sdk import Action
-from rasa_sdk.events import SlotSet
+#customQueryForm {
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    margin: 20px 0;
+}
 
-class ActionAddOption(Action):
-    def name(self):
-        return "action_add_option"
+#customQueryForm label {
+    display: block;
+    margin-bottom: 10px;
+}
 
-    def run(self, dispatcher, tracker, domain):
-        selected_options = tracker.get_slot("selected_options") or []
-        option = tracker.get_latest_entity_values("option").lower()
-
-        if option not in selected_options:
-            selected_options.append(option)
-
-        return [SlotSet("selected_options", selected_options)]
-
-class ActionShowSelectedOptions(Action):
-    def name(self):
-        return "action_show_selected_options"
-
-    def run(self, dispatcher, tracker, domain):
-        selected_options = tracker.get_slot("selected_options")
-        dispatcher.utter_message(text=f"Selected options: {', '.join(selected_options)}")
-
-        return []
+#customQueryForm button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
 ```
 
-### 3. Add the Buttons to your domain.yml
+### 3. Update JavaScript in `script.js`
 
-In the responses section, add a response with buttons for each option:
+Add the necessary JavaScript to handle showing the form, submitting it, and sending the data to the Rasa bot.
 
-```yaml
-responses:
-  utter_ask_options:
-    - text: "Please choose your options:"
-      buttons:
-        - title: "Option 1"
-          payload: '/select_option{"option": "option 1"}'
-        - title: "Option 2"
-          payload: '/select_option{"option": "option 2"}'
-        - title: "Option 3"
-          payload: '/select_option{"option": "option 3"}'
-        - title: "Done"
-          payload: '/show_selected_options'
+```js
+$(document).ready(function() {
+    $('.modal').modal();
+
+    // Open custom query form
+    $('#customQueryButton').click(function() {
+        $('#customQueryForm').toggleClass('hidden');
+    });
+
+    // Submit custom query form
+    async function submitForm() {
+        const form = document.getElementById('attributeForm');
+        const formData = new FormData(form);
+        const attributes = {};
+
+        formData.forEach((value, key) => {
+            attributes[key] = value === 'on';
+        });
+
+        const response = await fetch('http://localhost:5005/webhooks/rest/webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sender: 'user',
+                message: JSON.stringify(attributes)
+            }),
+        });
+
+        const data = await response.json();
+        console.log(data);
+        setBotResponse(data);
+
+        // Hide the form after submission
+        $('#customQueryForm').addClass('hidden');
+    }
+
+    // Function to send user message to Rasa server
+    function sendCustomQuery(query) {
+        $.ajax({
+            url: 'http://localhost:5005/webhooks/rest/webhook',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ message: query, sender: sender_id }),
+            success: function(botResponse, status) {
+                console.log('Response from Rasa:', botResponse, 'Status:', status);
+                setBotResponse(botResponse);
+            },
+            error: function(xhr, textStatus) {
+                console.log('Error from bot end:', textStatus);
+                setBotResponse([]);
+            }
+        });
+    }
+
+    // Function to set user response in chat window
+    function setUserResponse(message) {
+        // Your implementation here
+    }
+
+    // Function to set bot response in chat window
+    function setBotResponse(response) {
+        // Your implementation here
+    }
+
+    // Other existing functions...
+});
 ```
 
-### 4. Define the Intents and Entities in your nlu.yml
-
-```yaml
-nlu:
-- intent: select_option
-  examples: |
-    - Option 1
-    - Option 2
-    - Option 3
-
-entities:
-- option
-
-- intent: show_selected_options
-  examples: |
-    - Done
-    - Show selected options
-```
-
-### 5. Define the Rules or Stories in your rules.yml or stories.yml
-
-#### Using Rules
-
-```yaml
-rules:
-- rule: Add option to the list
-  steps:
-  - intent: select_option
-  - action: action_add_option
-
-- rule: Show selected options
-  steps:
-  - intent: show_selected_options
-  - action: action_show_selected_options
-```
-
-#### Using Stories
-
-```yaml
-stories:
-- story: Add option to the list
-  steps:
-  - intent: select_option
-  - action: action_add_option
-
-- story: Show selected options
-  steps:
-  - intent: show_selected_options
-  - action: action_show_selected_options
-```
-
-### 6. Trigger the Response with the Buttons
-
-You can trigger the response with the checklist of buttons in your stories or rules where needed:
-
-```yaml
-rules:
-- rule: Ask user to select options
-  steps:
-  - action: utter_ask_options
-```
-
-Now, users can select multiple options from the checklist, and the selected options will be stored in the `selected_options` slot. When the user clicks "Done," the selected options will be shown.I apologize for the confusion earlier. Let's refine the approach to create a checklist of buttons where users can select multiple options in Rasa. We'll ensure that the implementation is correct and handles the slot management properly.
-
-### 1. Define the Slots and Custom Actions in your domain.yml
-
-Define a list slot to store selected options:
-
-```yaml
-slots:
-  selected_options:
-    type: list
-    initial_value: []
-```
-
-Define custom actions to add options to the list and show selected options:
-
-```yaml
-actions:
-- action_add_option
-- action_show_selected_options
-```
-
-### 2. Implement the Custom Actions in your actions.py
-
-Implement the actions to handle adding options and showing selected options:
-
-```python
-from typing import Any, Text, Dict, List
-from rasa_sdk import Action, Tracker
-from rasa_sdk.executor import CollectingDispatcher
-from rasa_sdk.events import SlotSet
-
-
-class ActionAddOption(Action):
-    def name(self) -> Text:
-        return "action_add_option"
-
-    def run(self, dispatcher: CollectingDispatcher,
-            tracker: Tracker,
-            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-
-        option = tracker.latest_message['text']
-        selected_options = tracker.get_slot("selected_options") or []
-
-        if option not in selected_options:
-            selected_options.append(option)
-
-        return [SlotSet("selected_options", selected_options)]
-
-class ActionShowSelectedOptions(Action):
-    def name(self) -> Text:
-        return "action_show_selected_options"
-
-    def run(self, dispatcher: CollectingDispatcher,
-            tracker: Tracker,
-            domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
-
-        selected_options = tracker.get_slot("selected_options")
-        dispatcher.utter_message(text=f"Selected options: {', '.join(selected_options)}")
-
-        return []
-```
-
-### 3. Add the Buttons to your domain.yml
-
-Create a response that presents the options as buttons:
-
-```yaml
-responses:
-  utter_ask_options:
-    - text: "Please choose your options:"
-      buttons:
-        - title: "Option 1"
-          payload: "Option 1"
-        - title: "Option 2"
-          payload: "Option 2"
-        - title: "Option 3"
-          payload: "Option 3"
-        - title: "Done"
-          payload: "/show_selected_options"
-```
-
-### 4. Define the Rules or Stories in your rules.yml or stories.yml
-
-Create rules or stories to handle the flow of selecting options and showing selected options:
-
-#### Using Rules
-
-```yaml
-rules:
-- rule: Handle selecting options and showing selected options
-  steps:
-  - intent: greet   # adjust this intent as per your conversation flow
-  - action: utter_ask_options
-  - intent: inform
-  - action: action_add_option
-  - intent: inform
-  - action: action_add_option
-  - intent: inform
-  - action: action_add_option
-  - intent: /show_selected_options
-  - action: action_show_selected_options
-```
-
-#### Using Stories
-
-```yaml
-stories:
-- story: Handle selecting options and showing selected options
-  steps:
-  - intent: greet   # adjust this intent as per your conversation flow
-  - action: utter_ask_options
-  - intent: inform
-  - action: action_add_option
-  - intent: inform
-  - action: action_add_option
-  - intent: inform
-  - action: action_add_option
-  - intent: /show_selected_options
-  - action: action_show_selected_options
-```
-
-### 5. Trigger the Response with the Buttons
-
-Trigger the response with the checklist of buttons in your stories or rules where needed:
-
-```yaml
-rules:
-- rule: Ask user to select options
-  steps:
-  - action: utter_ask_options
-```
-
-Now, users can select multiple options from the checklist, and the selected options will be stored in the `selected_options` slot. When the user clicks "Done," the selected options will be shown. Adjust the intents (`greet`, `inform`, etc.) and payloads as per your specific use case. This setup ensures that each selected option is added to the slot correctly and that the selected options can be displayed upon user request.
+This implementation adds a custom query form within your chatbot frontend, allowing users to select attributes and send them to your Rasa bot. The bot will process the attributes and return a response, which will be displayed in the chat window.
