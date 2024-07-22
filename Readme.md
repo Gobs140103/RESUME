@@ -106,8 +106,11 @@ stories:
   - action: action_export_transactions
 ```
 
-This setup will allow users to request an export of their transactions, and your bot will handle querying the database, creating an Excel file, and providing a link for the user to download the file.
+Yes, you can use an Excel file instead of a PDF. The approach is quite similar. You'll need to modify the `renderPdfAttachment` function to handle Excel files by updating the icon, text, and download link accordingly.
 
+Here's how you can modify your function:
+
+```javascript
 /**
  * renders excel attachment on to the chat screen
  * @param {Object} excel_data json object
@@ -133,3 +136,32 @@ function renderExcelAttachment(excel_data) {
     $(".chats").append(excel_attachment);
     scrollToBottomOfResults();
 }
+```
+
+### Explanation:
+
+1. **Icon Change:**
+   - I've changed the icon class to `fa-file-excel-o` to represent an Excel file.
+   
+2. **Variable Names:**
+   - Updated the variable names to be specific to Excel files (`excel_url`, `excel_title`, `excel_attachment`).
+
+3. **HTML Structure:**
+   - The structure remains the same, but the text and icon have been updated to reflect an Excel file.
+
+### Example Usage:
+
+When you call this function, pass the Excel file data in the format expected:
+
+```javascript
+const excel_data = {
+    custom: {
+        url: "http://yourserver.com/files/exported_transactions.xlsx",
+        title: "Transactions Report"
+    }
+};
+
+renderExcelAttachment(excel_data);
+```
+
+This will render the Excel file attachment in the chat with a link to view and download the file.
