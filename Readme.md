@@ -107,3 +107,29 @@ stories:
 ```
 
 This setup will allow users to request an export of their transactions, and your bot will handle querying the database, creating an Excel file, and providing a link for the user to download the file.
+
+/**
+ * renders excel attachment on to the chat screen
+ * @param {Object} excel_data json object
+ */
+function renderExcelAttachment(excel_data) {
+    const { url: excel_url } = excel_data.custom;
+    const { title: excel_title } = excel_data.custom;
+    const excel_attachment = `
+        <div class="excel_attachment">
+            <div class="row">
+                <div class="col s3 excel_icon">
+                    <i class="fa fa-file-excel-o" aria-hidden="true"></i>
+                </div>
+                <div class="col s9 excel_link">
+                    <a href="${excel_url}" target="_blank">${excel_title}</a>
+                    <a href="${excel_url}" download="${excel_title}" class="download_button">
+                        <i class="fa fa-download" aria-hidden="true"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>`;
+
+    $(".chats").append(excel_attachment);
+    scrollToBottomOfResults();
+}
