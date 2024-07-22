@@ -1,106 +1,109 @@
+To allow users to export transaction results to an Excel file in your Rasa chatbot, you can follow these steps:
 
-Here's an outline and content for your presentation on the chatbot project for your corporate card payment net site:
+1. **Fetch Transaction Data:**
+   Query your Oracle database to retrieve the transaction data using `cx_Oracle`.
 
----
+2. **Generate Excel File:**
+   Use the `pandas` library to create a DataFrame and export it to an Excel file.
 
-## Slide 1: Title Slide
-**Title:** Enhancing User and Support Staff Experience with Our Corporate Card Payment Chatbot  
-**Subtitle:** Leveraging Rasa, HTML, CSS, and JavaScript  
-**Presenter:** [Your Name]  
-**Date:** [Presentation Date]  
+3. **Send the File to the User:**
+   Serve the generated Excel file to the user via a download link or send it as an attachment.
 
----
+Here's a step-by-step implementation:
 
-## Slide 2: Introduction
-**Title:** Introduction  
-**Content:**  
-- Brief overview of the corporate card payment net site
-- Importance of user experience and efficient support in the corporate card payment industry
+### Step 1: Query the Database
 
----
+First, ensure you have `cx_Oracle` and `pandas` installed:
+```bash
+pip install cx_Oracle pandas openpyxl
+```
 
-## Slide 3: The Need for a Chatbot
-**Title:** Why We Need a Chatbot  
-**Content:**  
-- Increasing user expectations for instant support and information
-- High volume of repetitive inquiries overwhelming support staff
-- Need for 24/7 assistance to accommodate different time zones and emergencies
-- Enhancing user engagement and satisfaction with interactive features
+### Step 2: Create a Custom Action to Query and Export Data
 
----
+In your Rasa project, create a custom action to handle the database query and file creation.
 
-## Slide 4: Current Issues
-**Title:** Current Issues  
-**Content:**  
-- **High Support Load:** Support staff spending significant time on repetitive queries
-- **Delayed Responses:** Users experiencing delays in receiving assistance
-- **Limited Availability:** Support staff available only during working hours
-- **User Frustration:** Frustration due to navigation difficulties and lengthy response times
+**actions.py:**
+```python
+import cx_Oracle
+import pandas as pd
+from rasa_sdk import Action, Tracker
+from rasa_sdk.executor import CollectingDispatcher
+from rasa_sdk.types import DomainDict
 
----
+class ActionExportTransactions(Action):
 
-## Slide 5: Our Solution
-**Title:** Our Solution: The Chatbot  
-**Content:**  
-- **Automated Support:** Handles repetitive queries, freeing up support staff for complex issues
-- **Instant Responses:** Provides users with immediate assistance, reducing wait times
-- **24/7 Availability:** Always available to help users regardless of time zones
-- **Enhanced Navigation:** Guides users through the site, improving overall experience
+    def name(self) -> str:
+        return "action_export_transactions"
 
----
+    def run(self, dispatcher: CollectingDispatcher, tracker: Tracker, domain: DomainDict) -> list:
+        # Establish the database connection
+        connection = cx_Oracle.connect(user="your_username", password="your_password", dsn="your_dsn")
+        cursor = connection.cursor()
+        
+        # Query the database
+        query = "SELECT * FROM transactions"
+        cursor.execute(query)
+        rows = cursor.fetchall()
 
-## Slide 6: Technologies Used
-**Title:** Technologies Used  
-**Content:**  
-- **Rasa:** For natural language understanding and processing
-- **HTML, CSS, and JavaScript:** For creating an interactive and responsive front-end
-- **cx_Oracle:** For seamless database interactions
+        # Get column names
+        col_names = [row[0] for row in cursor.description]
+        
+        # Create a DataFrame
+        df = pd.DataFrame(rows, columns=col_names)
+        
+        # Export to Excel
+        file_path = "/path/to/exported_transactions.xlsx"
+        df.to_excel(file_path, index=False)
 
----
+        # Close the connection
+        cursor.close()
+        connection.close()
+        
+        # Inform the user and provide download link
+        dispatcher.utter_message(text=f"Your transaction data has been exported successfully. You can download it [here](http://yourserver.com/files/exported_transactions.xlsx)")
+        
+        return []
+```
 
-## Slide 7: Chatbot Features
-**Title:** Key Features of the Chatbot  
-**Content:**  
-- **User Queries:** Quickly addresses common questions related to payments, card usage, etc.
-- **Support Requests:** Escalates complex issues to support staff when needed
-- **Date Range Picker:** Allows users to select date ranges for transaction history and other queries
-- **Interactive Elements:** Engages users with buttons, quick replies, and more
+### Step 3: Handle File Serving
 
----
+You'll need to serve the file via a web server so the user can download it. You can use Flask to handle this.
 
-## Slide 8: Implementation Details
-**Title:** Implementation Details  
-**Content:**  
-- **Rasa Integration:** Uses Rasa for building conversational flows and understanding user intent
-- **Frontend Development:** Built with HTML, CSS, and JavaScript for a seamless user interface
-- **Backend Integration:** Connects to Oracle database using cx_Oracle for real-time data retrieval
+**app.py (Flask):**
+```python
+from flask import Flask, send_from_directory
 
----
+app = Flask(__name__)
 
-## Slide 9: Benefits
-**Title:** Benefits of the Chatbot  
-**Content:**  
-- **Reduced Support Load:** Support staff can focus on complex issues
-- **Improved User Experience:** Faster, more efficient user interactions
-- **Cost Efficiency:** Reduced need for extensive support team during off-hours
-- **Data Insights:** Analytics on user queries to improve services
+@app.route('/files/<filename>')
+def download_file(filename):
+    return send_from_directory("/path/to", filename)
 
----
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
+```
 
-## Slide 10: Conclusion
-**Title:** Conclusion  
-**Content:**  
-- Recap of the need, issues, and our chatbot solution
-- Expected positive impact on user and support staff experience
-- Future plans for further enhancing the chatbot and integrating more features
+Make sure your Rasa action server and Flask server are running. The `dispatcher.utter_message` in the custom action provides a link to download the file.
 
----
+### Step 4: Add the Custom Action to Your Rasa Domain
 
-## Slide 11: Q&A
-**Title:** Questions & Answers  
-**Content:**  
-- Open the floor for questions from the audience
+**domain.yml:**
+```yaml
+actions:
+- action_export_transactions
+```
 
----
+### Step 5: Update Your Stories or Rules
 
-Feel free to customize the content and slides according to your specific requirements and audience.
+Ensure you have a story or rule that triggers the `action_export_transactions` action.
+
+**stories.yml:**
+```yaml
+stories:
+- story: export transactions
+  steps:
+  - intent: export_transactions
+  - action: action_export_transactions
+```
+
+This setup will allow users to request an export of their transactions, and your bot will handle querying the database, creating an Excel file, and providing a link for the user to download the file.
